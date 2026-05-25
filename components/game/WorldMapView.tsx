@@ -9,22 +9,20 @@ import { cn } from "@/lib/utils";
 
 // Region config — positions on the map (% of container)
 const REGION_POSITIONS: Record<string, { x: number; y: number; emoji: string; color: string }> = {
-  "verdant_vale": { x: 20, y: 65, emoji: "🌲", color: "oklch(0.55 0.18 145)" },
-  "misty_marshes": { x: 38, y: 40, emoji: "💧", color: "oklch(0.55 0.15 220)" },
-  "frostpeak": { x: 18, y: 22, emoji: "❄️", color: "oklch(0.65 0.12 220)" },
-  "sunfire_desert": { x: 62, y: 60, emoji: "🔥", color: "oklch(0.65 0.2 40)" },
-  "neon_city": { x: 78, y: 35, emoji: "⚡", color: "oklch(0.65 0.2 280)" },
-  "storm_peaks": { x: 60, y: 16, emoji: "⛈️", color: "oklch(0.6 0.12 260)" },
+  "verdant-vale": { x: 22, y: 68, emoji: "🌲", color: "oklch(0.55 0.18 145)" },
+  "misty-marshes": { x: 42, y: 50, emoji: "💧", color: "oklch(0.55 0.15 220)" },
+  "frostpeak": { x: 20, y: 25, emoji: "❄️", color: "oklch(0.65 0.12 220)" },
+  "shadow-citadel": { x: 68, y: 55, emoji: "💀", color: "oklch(0.55 0.15 280)" },
+  "dragons-peak": { x: 72, y: 22, emoji: "🐉", color: "oklch(0.65 0.2 40)" },
 };
 
 // Dotted path connections between region nodes (in order)
 const PATHS = [
-  ["verdant_vale", "misty_marshes"],
-  ["misty_marshes", "frostpeak"],
-  ["misty_marshes", "sunfire_desert"],
-  ["sunfire_desert", "neon_city"],
-  ["neon_city", "storm_peaks"],
-  ["frostpeak", "storm_peaks"],
+  ["verdant-vale", "misty-marshes"],
+  ["misty-marshes", "frostpeak"],
+  ["misty-marshes", "shadow-citadel"],
+  ["shadow-citadel", "dragons-peak"],
+  ["frostpeak", "dragons-peak"],
 ];
 
 interface RegionNode {
