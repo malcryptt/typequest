@@ -1,348 +1,322 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useGameStore } from '@/lib/game/store';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import type { Region, Level } from '@/lib/game/types';
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useGameStore } from "@/lib/game/store";
+import { REGIONS } from "@/lib/game/regions";
+import { Lock, Star, ChevronRight, X, Package, ShoppingBag, ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-// Region card component
-function RegionCard({
-  region,
-  isSelected,
-  onSelect
-}: {
-  region: Region;
-  isSelected: boolean;
-  onSelect: () => void;
-}) {
-  const { progress } = useGameStore();
-  const completedLevels = region.levels.filter(l => l.completed).length;
-  const totalLevels = region.levels.length;
-  const progressPercent = (completedLevels / totalLevels) * 100;
+// Region config — positions on the map (% of container)
+const REGION_POSITIONS: Record<string, { x: number; y: number; emoji: string; color: string }> = {
+  "verdant_vale": { x: 20, y: 65, emoji: "🌲", color: "oklch(0.55 0.18 145)" },
+  "misty_marshes": { x: 38, y: 40, emoji: "💧", color: "oklch(0.55 0.15 220)" },
+  "frostpeak": { x: 18, y: 22, emoji: "❄️", color: "oklch(0.65 0.12 220)" },
+  "sunfire_desert": { x: 62, y: 60, emoji: "🔥", color: "oklch(0.65 0.2 40)" },
+  "neon_city": { x: 78, y: 35, emoji: "⚡", color: "oklch(0.65 0.2 280)" },
+  "storm_peaks": { x: 60, y: 16, emoji: "⛈️", color: "oklch(0.6 0.12 260)" },
+};
 
-  const isLocked = !region.unlocked;
+// Dotted path connections between region nodes (in order)
+const PATHS = [
+  ["verdant_vale", "misty_marshes"],
+  ["misty_marshes", "frostpeak"],
+  ["misty_marshes", "sunfire_desert"],
+  ["sunfire_desert", "neon_city"],
+  ["neon_city", "storm_peaks"],
+  ["frostpeak", "storm_peaks"],
+];
 
+interface RegionNode {
+  id: string;
+  name: string;
+  description: string;
+  requiredLevel: number;
+  levels: { id: string; name: string }[];
+  environment: string;
+}
+
+function StarRating({ count }: { count: number }) {
   return (
-    <button
-      onClick={onSelect}
-      disabled={isLocked}
-      className={cn(
-        "relative w-full p-4 rounded-xl border-2 transition-all text-left",
-        isSelected
-          ? "border-primary bg-primary/10 scale-105 shadow-lg"
-          : "border-border bg-card hover:border-primary/50 hover:bg-card/80",
-        isLocked && "opacity-50 cursor-not-allowed grayscale"
-      )}
-    >
-      {/* Lock overlay */}
-      {isLocked && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl z-10">
-          <div className="text-center">
-            <svg
-              className="w-8 h-8 mx-auto mb-2 text-muted-foreground"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            <span className="text-sm text-muted-foreground">Level {region.requiredLevel} Required</span>
-          </div>
-        </div>
-      )}
-
-      {/* Region color indicator */}
-      <div
-        className="w-full h-2 rounded-full mb-3"
-        style={{ backgroundColor: region.color }}
-      />
-
-      {/* Region info */}
-      <h3 className="text-lg font-bold text-foreground mb-1">{region.name}</h3>
-      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{region.description}</p>
-
-      {/* Progress bar */}
-      <div className="space-y-1">
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{completedLevels}/{totalLevels} Levels</span>
-          <span>{Math.round(progressPercent)}%</span>
-        </div>
-        <div className="h-2 bg-secondary rounded-full overflow-hidden">
-          <div
-            className="h-full transition-all duration-500"
-            style={{
-              width: `${progressPercent}%`,
-              backgroundColor: region.color
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Completed badge */}
-      {region.completed && (
-        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-success flex items-center justify-center">
-          <svg className="w-4 h-4 text-success-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </div>
-      )}
-    </button>
+    <div className="flex gap-0.5">
+      {[1, 2, 3].map(i => (
+        <Star key={i} size={12} className={i <= count ? "fill-yellow-400 text-yellow-400" : "fill-muted text-muted"} />
+      ))}
+    </div>
   );
 }
 
-// Level selection panel
-function LevelPanel({
-  region,
-  onSelectLevel
-}: {
-  region: Region;
-  onSelectLevel: (levelId: string) => void;
+function RegionDetailPanel({ region, onClose, onEnter }: {
+  region: RegionNode; onClose: () => void; onEnter: () => void;
 }) {
   const { regionProgress } = useGameStore();
-  const completedLevels = regionProgress[region.id]?.completedLevels || [];
+  const progress = regionProgress[region.id];
+  const completedCount = progress?.completedLevels?.length ?? 0;
+  const totalLevels = region.levels.length;
+  const completionPct = totalLevels > 0 ? Math.round((completedCount / totalLevels) * 100) : 0;
+  const totalStars = Object.values(progress?.levelStars ?? {}).reduce((a, b) => a + b, 0);
+  const maxStars = totalLevels * 3;
+  const pos = REGION_POSITIONS[region.id];
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3 mb-4">
-        <div
-          className="w-4 h-4 rounded-full"
-          style={{ backgroundColor: region.color }}
-        />
-        <h2 className="text-2xl font-bold text-foreground">{region.name}</h2>
+    <motion.div className="absolute right-0 top-0 bottom-0 w-full sm:w-80 z-30 flex flex-col"
+      initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      style={{ background: "oklch(0.12 0.04 280 / 0.95)", borderLeft: `1px solid ${pos?.color ?? "oklch(0.3 0.08 280)"}44`, backdropFilter: "blur(20px)" }}>
+      {/* Header */}
+      <div className="p-5 flex items-start justify-between"
+        style={{ borderBottom: "1px solid oklch(0.22 0.05 280 / 0.5)" }}>
+        <div>
+          <div className="text-3xl mb-1">{pos?.emoji}</div>
+          <h2 className="text-xl font-bold text-foreground">{region.name}</h2>
+          <p className="text-sm text-muted-foreground mt-1">{region.description ?? "A mysterious region awaits."}</p>
+        </div>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors mt-1">
+          <X size={20} />
+        </button>
       </div>
 
-      <p className="text-muted-foreground mb-6">{region.description}</p>
+      {/* Completion ring + stars */}
+      <div className="flex items-center gap-4 px-5 py-4" style={{ borderBottom: "1px solid oklch(0.22 0.05 280 / 0.5)" }}>
+        <div className="relative w-16 h-16 flex-shrink-0">
+          <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
+            <circle cx="32" cy="32" r="26" fill="none" stroke="oklch(0.22 0.05 280)" strokeWidth="6" />
+            <motion.circle cx="32" cy="32" r="26" fill="none" strokeWidth="6"
+              stroke={pos?.color ?? "oklch(0.55 0.18 280)"} strokeLinecap="round"
+              initial={{ pathLength: 0 }} animate={{ pathLength: completionPct / 100 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              style={{ pathLength: completionPct / 100, strokeDasharray: "1", strokeDashoffset: "0" }} />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xs font-bold text-foreground">{completionPct}%</span>
+          </div>
+        </div>
+        <div>
+          <p className="text-sm text-foreground font-semibold">{completedCount}/{totalLevels} Stages</p>
+          <div className="flex items-center gap-1 mt-1">
+            <Star size={14} className="fill-yellow-400 text-yellow-400" />
+            <span className="text-sm text-muted-foreground">{totalStars}/{maxStars} Stars</span>
+          </div>
+        </div>
+      </div>
 
-      {/* Level list */}
-      <div className="space-y-2">
-        {region.levels.map((level, index) => {
-          const previousLevel = index > 0 ? region.levels[index - 1] : null;
-          const isLocked = previousLevel && !previousLevel.completed && index > 0 && !completedLevels.includes(level.id);
-          const isBoss = level.boss !== undefined;
-
+      {/* Stage list */}
+      <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+        {region.levels.slice(0, 10).map((level, i) => {
+          const stars = progress?.levelStars?.[level.id] ?? 0;
+          const completed = progress?.completedLevels?.includes(level.id) ?? false;
           return (
-            <button
-              key={level.id}
-              onClick={() => !isLocked && onSelectLevel(level.id)}
-              disabled={isLocked}
-              className={cn(
-                "w-full p-4 rounded-lg border transition-all text-left flex items-center gap-4",
-                level.completed
-                  ? "border-success/50 bg-success/10"
-                  : isLocked
-                    ? "border-muted bg-muted/30 opacity-50 cursor-not-allowed"
-                    : "border-border bg-card hover:border-primary hover:bg-primary/10",
-                isBoss && !isLocked && "border-destructive/50 bg-destructive/10 hover:border-destructive"
-              )}
-            >
-              {/* Level number or lock */}
-              <div className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg",
-                level.completed
-                  ? "bg-success text-success-foreground"
-                  : isLocked
-                    ? "bg-muted text-muted-foreground"
-                    : isBoss
-                      ? "bg-destructive text-destructive-foreground"
-                      : "bg-primary text-primary-foreground"
-              )}>
-                {isLocked ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                ) : isBoss ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
-                ) : (
-                  index + 1
-                )}
+            <div key={level.id}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+              style={{ background: completed ? "oklch(0.16 0.05 280 / 0.6)" : "oklch(0.12 0.03 280 / 0.4)", border: "1px solid oklch(0.22 0.05 280 / 0.4)" }}>
+              <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                style={{ background: completed ? (pos?.color ?? "oklch(0.55 0.18 280)") : "oklch(0.18 0.04 280)", color: completed ? "#fff" : "oklch(0.5 0.05 280)" }}>
+                {i + 1}
               </div>
-
-              {/* Level info */}
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold text-foreground">{level.name}</h4>
-                  {isBoss && (
-                    <span className="px-2 py-0.5 text-xs bg-destructive text-destructive-foreground rounded-full">
-                      BOSS
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">{level.description}</p>
-              </div>
-
-              {/* Stars */}
-              {level.completed && (
-                <div className="flex gap-0.5">
-                  {[1, 2, 3].map((star) => (
-                    <svg
-                      key={star}
-                      className={cn(
-                        "w-5 h-5",
-                        star <= level.stars ? "text-warning" : "text-muted"
-                      )}
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg>
-                  ))}
-                </div>
-              )}
-
-              {/* Rewards preview */}
-              {!level.completed && !isLocked && (
-                <div className="text-right text-sm">
-                  <div className="text-gold">+{level.rewards.gold} Gold</div>
-                  <div className="text-experience">+{level.rewards.experience} XP</div>
-                </div>
-              )}
-            </button>
+              <p className="flex-1 text-sm text-foreground truncate">{level.name}</p>
+              <StarRating count={stars} />
+            </div>
           );
         })}
       </div>
-    </div>
-  );
-}
 
-// Player stats header
-function PlayerHeader() {
-  const { progress, setScreen } = useGameStore();
-
-  const expPercent = (progress.experience / progress.experienceToNext) * 100;
-
-  return (
-    <div className="bg-card border-b border-border p-4">
-      <div className="max-w-6xl mx-auto flex items-center justify-between">
-        {/* Player info */}
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl">
-            {progress.level}
-          </div>
-          <div>
-            <div className="font-semibold text-foreground">Level {progress.level}</div>
-            <div className="flex items-center gap-2">
-              <div className="w-32 h-2 bg-secondary rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-experience transition-all"
-                  style={{ width: `${expPercent}%` }}
-                />
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {progress.experience}/{progress.experienceToNext} XP
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Gold and quick actions */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-4 py-2 bg-secondary rounded-lg">
-            <div className="w-6 h-6 rounded-full bg-gold/20 flex items-center justify-center">
-              <span className="text-gold font-bold text-sm">G</span>
-            </div>
-            <span className="font-semibold">{progress.gold}</span>
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setScreen('character-select')}
-          >
-            Characters
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setScreen('inventory')}
-          >
-            Inventory
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setScreen('shop')}
-          >
-            Shop
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setScreen('settings')}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </Button>
-        </div>
+      {/* Enter button */}
+      <div className="p-5">
+        <motion.button onClick={onEnter} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+          className="w-full h-14 rounded-xl font-bold text-white flex items-center justify-center gap-2"
+          style={{ background: `linear-gradient(135deg, ${pos?.color ?? "oklch(0.55 0.18 280)"}, oklch(0.4 0.12 280))`, boxShadow: `0 4px 24px ${pos?.color ?? "oklch(0.55 0.18 280)"}55` }}>
+          Enter Region <ChevronRight size={20} />
+        </motion.button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 export function WorldMapView() {
-  const { regions, progress, startCombat, setScreen, selectRegion } = useGameStore();
-  const [selectedRegion, setSelectedRegion] = useState<Region | null>(
-    regions.find(r => r.id === progress.currentRegion) || regions[0]
-  );
+  const { player, regionProgress, setGameState, startCombat, currentLevel, selectRegion } = useGameStore();
+  const [selectedRegion, setSelectedRegion] = useState<(typeof REGIONS)[0] | null>(null);
 
-  const handleSelectRegion = (region: Region) => {
-    setSelectedRegion(region);
-    selectRegion(region.id);
-  };
+  if (!player) return null;
 
-  const handleSelectLevel = (levelId: string) => {
-    startCombat(levelId);
+  const handleEnterRegion = () => {
+    if (!selectedRegion) return;
+    const firstUncompletedLevel = selectedRegion.levels.find(
+      l => !regionProgress[selectedRegion.id]?.completedLevels?.includes(l.id)
+    ) ?? selectedRegion.levels[0];
+    if (firstUncompletedLevel) {
+      selectRegion(selectedRegion.id);
+      startCombat(firstUncompletedLevel.id);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <PlayerHeader />
+    <div className="fixed inset-0 overflow-hidden" style={{ background: "oklch(0.07 0.04 280)" }}>
+      {/* Parchment map background */}
+      <div className="absolute inset-0"
+        style={{
+          background: `
+          radial-gradient(ellipse at 50% 40%, oklch(0.18 0.06 280 / 0.6) 0%, transparent 60%),
+          radial-gradient(ellipse at 20% 70%, oklch(0.15 0.05 145 / 0.3) 0%, transparent 40%),
+          radial-gradient(ellipse at 80% 20%, oklch(0.15 0.05 40 / 0.2) 0%, transparent 40%),
+          oklch(0.09 0.04 280)
+        ` }}>
+        {/* Texture lines for parchment feel */}
+        {[...Array(8)].map((_, i) => (
+          <div key={i} className="absolute w-full h-px opacity-5"
+            style={{ top: `${10 + i * 12}%`, background: "linear-gradient(90deg, transparent, oklch(0.7 0.05 280), transparent)" }} />
+        ))}
+      </div>
 
-      <div className="flex-1 p-6">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold text-foreground mb-6">World Map</h1>
+      {/* SVG Paths between regions */}
+      <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
+        <defs>
+          <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3" markerHeight="3">
+            <circle cx="5" cy="5" r="3" fill="oklch(0.45 0.08 280)" />
+          </marker>
+        </defs>
+        {PATHS.map(([fromId, toId]) => {
+          const from = REGION_POSITIONS[fromId];
+          const to = REGION_POSITIONS[toId];
+          if (!from || !to) return null;
+          const fromUnlocked = regionProgress[fromId]?.unlocked ?? false;
+          const toUnlocked = regionProgress[toId]?.unlocked ?? false;
+          const isActive = fromUnlocked && toUnlocked;
+          return (
+            <line key={`${fromId}-${toId}`}
+              x1={`${from.x}%`} y1={`${from.y}%`} x2={`${to.x}%`} y2={`${to.y}%`}
+              stroke={isActive ? "oklch(0.55 0.15 280)" : "oklch(0.25 0.05 280)"}
+              strokeWidth="2" strokeDasharray="6 4" opacity={isActive ? 0.7 : 0.3} />
+          );
+        })}
+      </svg>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Region selection */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-muted-foreground">Regions</h2>
-              <div className="space-y-3">
-                {regions.map((region) => (
-                  <RegionCard
-                    key={region.id}
-                    region={region}
-                    isSelected={selectedRegion?.id === region.id}
-                    onSelect={() => handleSelectRegion(region)}
-                  />
-                ))}
+      {/* Region Nodes */}
+      <div className="absolute inset-0" style={{ zIndex: 2 }}>
+        {REGIONS.map((region) => {
+          const pos = REGION_POSITIONS[region.id];
+          if (!pos) return null;
+          const progress = regionProgress[region.id];
+          const unlocked = progress?.unlocked ?? false;
+          const isSelected = selectedRegion?.id === region.id;
+          const completedCount = progress?.completedLevels?.length ?? 0;
+          const totalLevels = region.levels.length;
+
+          return (
+            <motion.button key={region.id}
+              onClick={() => {
+                if (!unlocked) return;
+                setSelectedRegion(isSelected ? null : region);
+              }}
+              className="absolute flex flex-col items-center gap-1 group"
+              style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -50%)" }}
+              whileHover={unlocked ? { scale: 1.1 } : {}}
+              whileTap={unlocked ? { scale: 0.95 } : {}}>
+              {/* Node circle */}
+              <motion.div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center"
+                animate={unlocked ? {
+                  boxShadow: isSelected
+                    ? [`0 0 20px ${pos.color}`, `0 0 45px ${pos.color}`, `0 0 20px ${pos.color}`]
+                    : [`0 0 10px ${pos.color}55`, `0 0 25px ${pos.color}88`, `0 0 10px ${pos.color}55`],
+                } : {}}
+                transition={{ duration: 2, repeat: Infinity }}
+                style={{
+                  background: unlocked
+                    ? `radial-gradient(circle at 35% 35%, ${pos.color}33, oklch(0.1 0.04 280))`
+                    : "oklch(0.14 0.03 280)",
+                  border: `2px solid ${unlocked ? pos.color : "oklch(0.25 0.05 280)"}`,
+                  opacity: unlocked ? 1 : 0.4,
+                }}>
+                <span className="text-2xl sm:text-3xl" style={{ filter: unlocked ? "none" : "grayscale(1)" }}>
+                  {pos.emoji}
+                </span>
+                {!unlocked && (
+                  <div className="absolute inset-0 rounded-full flex items-center justify-center"
+                    style={{ background: "oklch(0.08 0.03 280 / 0.7)" }}>
+                    <Lock size={16} className="text-muted-foreground" />
+                  </div>
+                )}
+                {/* Completion mini-bar */}
+                {unlocked && totalLevels > 0 && (
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-10 h-1.5 rounded-full overflow-hidden"
+                    style={{ background: "oklch(0.2 0.04 280)" }}>
+                    <div className="h-full rounded-full transition-all"
+                      style={{ width: `${(completedCount / totalLevels) * 100}%`, background: pos.color }} />
+                  </div>
+                )}
+              </motion.div>
+              {/* Label */}
+              <div className="text-center">
+                <p className={cn("text-xs font-bold tracking-wide", unlocked ? "text-foreground" : "text-muted-foreground/50")}
+                  style={{ textShadow: unlocked ? "0 0 8px oklch(0.08 0.04 280), 0 0 20px oklch(0.08 0.04 280)" : "none" }}>
+                  {region.name}
+                </p>
+                {!unlocked && (
+                  <p className="text-xs text-muted-foreground/40">Lv.{region.requiredLevel}</p>
+                )}
               </div>
-            </div>
+            </motion.button>
+          );
+        })}
+      </div>
 
-            {/* Level selection */}
-            <div className="lg:col-span-2 bg-card border border-border rounded-xl p-6">
-              {selectedRegion ? (
-                <LevelPanel
-                  region={selectedRegion}
-                  onSelectLevel={handleSelectLevel}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  Select a region to view levels
-                </div>
-              )}
+      {/* Top Bar */}
+      <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-4 pb-3 flex items-center gap-3"
+        style={{ background: "oklch(0.1 0.04 280 / 0.8)", borderBottom: "1px solid oklch(0.22 0.05 280 / 0.4)", backdropFilter: "blur(16px)" }}>
+        <button onClick={() => setGameState("townHub")}
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          style={{ background: "oklch(0.16 0.04 280 / 0.5)" }}>
+          <ArrowLeft size={18} />
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+            style={{ background: "oklch(0.55 0.18 45)", color: "#fff" }}>
+            {player.level}
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground leading-none">{player.name}</p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <div className="h-1.5 w-20 rounded-full overflow-hidden" style={{ background: "oklch(0.2 0.04 280)" }}>
+                <div className="h-full rounded-full" style={{ width: `${(player.experience / player.experienceToNext) * 100}%`, background: "oklch(0.6 0.18 280)" }} />
+              </div>
+              <span className="text-xs text-muted-foreground">{player.experience}/{player.experienceToNext}</span>
             </div>
           </div>
         </div>
+        <div className="flex-1" />
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl"
+            style={{ background: "oklch(0.16 0.04 280 / 0.6)", border: "1px solid oklch(0.28 0.06 280 / 0.5)" }}>
+            <span className="text-yellow-400 text-sm">🪙</span>
+            <span className="text-sm font-bold text-foreground">{player.gold.toLocaleString()}</span>
+          </div>
+          <button onClick={() => setGameState("inventory")} className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" style={{ background: "oklch(0.16 0.04 280 / 0.5)" }}>
+            <Package size={18} />
+          </button>
+          <button onClick={() => setGameState("shop")} className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" style={{ background: "oklch(0.16 0.04 280 / 0.5)" }}>
+            <ShoppingBag size={18} />
+          </button>
+        </div>
       </div>
+
+      {/* Fog of war overlay on locked regions (general overlay) */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        zIndex: 1,
+        background: "radial-gradient(ellipse at 50% 110%, oklch(0.07 0.04 280 / 0.8) 0%, transparent 60%)"
+      }} />
+
+      {/* Region Detail Slide-in Panel */}
+      <AnimatePresence>
+        {selectedRegion && (
+          <div className="absolute inset-0 z-20" style={{ pointerEvents: "none" }}>
+            <div style={{ pointerEvents: "auto", position: "absolute", inset: 0 }}>
+              <RegionDetailPanel
+                region={selectedRegion as RegionNode}
+                onClose={() => setSelectedRegion(null)}
+                onEnter={handleEnterRegion} />
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

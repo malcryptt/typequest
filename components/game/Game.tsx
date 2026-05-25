@@ -8,7 +8,8 @@ import { CombatView } from "./CombatView";
 import { InventoryView } from "./InventoryView";
 import { ShopView } from "./ShopView";
 import { TownHubView } from "./DialogueView";
-import { LevelCompleteScreen, GameOverScreen } from "./ResultScreens";
+import { VictoryScreen } from "./VictoryScreen";
+import { GameOverScreen } from "./ResultScreens";
 
 export function Game() {
   const { gameState, loadGame, currentLevel, player } = useGameStore();
@@ -63,7 +64,7 @@ export function Game() {
       case "shop":
         return <ShopView />;
       case "levelComplete":
-        return <LevelCompleteScreen />;
+        return <VictoryScreen />;
       case "gameOver":
         return <GameOverScreen />;
       default:
