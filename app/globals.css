@@ -36,6 +36,13 @@
   --experience: oklch(0.65 0.18 85);
   --gold: oklch(0.75 0.18 85);
   
+  /* Cinematic visual tokens */
+  --world-accent-color: oklch(0.7 0.18 280);
+  --glass-bg: oklch(0.15 0.04 280 / 0.7);
+  --glass-border: oklch(0.4 0.08 280 / 0.5);
+  --correct-color: oklch(0.7 0.2 145);
+  --wrong-color: oklch(0.6 0.22 25);
+  --pending-color: oklch(0.9 0.02 280);
   /* Character class colors */
   --knight: oklch(0.55 0.15 30);
   --mage: oklch(0.55 0.20 280);
@@ -125,6 +132,15 @@
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
 }
 
 .animate-shake {

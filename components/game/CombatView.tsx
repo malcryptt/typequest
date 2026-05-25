@@ -9,6 +9,10 @@ import { CombatArena } from './3d/CombatArena';
 import { useGameStore } from '@/lib/game/store';
 import { getCharacter } from '@/lib/game/characters';
 import { cn } from '@/lib/utils';
+import { ParallaxBackground } from './cinematic/parallax-background';
+import { HudPanel, StatDisplay } from './cinematic/hud-panel';
+import { WordDisplay } from './cinematic/word-display';
+import { Heart, Zap, Target, Activity, Flame, Swords } from 'lucide-react';
 
 function CombatScene() {
   const { combat, progress, regions } = useGameStore();
@@ -16,15 +20,15 @@ function CombatScene() {
   const [enemyAttacking, setEnemyAttacking] = useState(false);
   const [playerHurt, setPlayerHurt] = useState(false);
   const [enemyHurt, setEnemyHurt] = useState(false);
-  
+
   const character = getCharacter(progress.currentCharacter);
   const region = regions.find(r => r.levels.some(l => l.id === progress.currentLevel));
   const environment = region?.environment || 'forest';
-  
+
   // Track damage for animations
   const [lastEnemyHealth, setLastEnemyHealth] = useState(combat.enemyHealth);
   const [lastPlayerHealth, setLastPlayerHealth] = useState(combat.playerHealth);
-  
+
   useEffect(() => {
     if (combat.enemyHealth < lastEnemyHealth) {
       setPlayerAttacking(true);
@@ -36,7 +40,7 @@ function CombatScene() {
     }
     setLastEnemyHealth(combat.enemyHealth);
   }, [combat.enemyHealth, lastEnemyHealth]);
-  
+
   useEffect(() => {
     if (combat.playerHealth < lastPlayerHealth) {
       setEnemyAttacking(true);
@@ -48,13 +52,13 @@ function CombatScene() {
     }
     setLastPlayerHealth(combat.playerHealth);
   }, [combat.playerHealth, lastPlayerHealth]);
-  
+
   if (!character) return null;
-  
+
   return (
     <>
       <CombatArena environment={environment} />
-      
+
       {/* Player character */}
       <LowPolyCharacter
         characterClass={progress.currentCharacter}
@@ -65,7 +69,7 @@ function CombatScene() {
         isHurt={playerHurt}
         isIdle={!playerAttacking && !playerHurt}
       />
-      
+
       {/* Enemy */}
       {combat.currentEnemy && (
         <LowPolyEnemy
@@ -78,9 +82,9 @@ function CombatScene() {
           healthPercent={(combat.enemyHealth / combat.currentEnemy.maxHealth) * 100}
         />
       )}
-      
+
       {/* Camera controls - limited for gameplay */}
-      <OrbitControls 
+      <OrbitControls
         enableZoom={false}
         enablePan={false}
         minPolarAngle={Math.PI / 4}
@@ -96,7 +100,7 @@ function CombatScene() {
 // Damage number floating display
 function DamageNumbers() {
   const { combat } = useGameStore();
-  
+
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
       {combat.damageNumbers.map((dmg) => (
@@ -126,94 +130,58 @@ function DamageNumbers() {
 function StatBars() {
   const { combat, progress } = useGameStore();
   const character = getCharacter(progress.currentCharacter);
-  
+
   if (!character) return null;
-  
+
   const healthPercent = (combat.playerHealth / character.stats.maxHealth) * 100;
   const manaPercent = (combat.playerMana / character.stats.maxMana) * 100;
-  const enemyHealthPercent = combat.currentEnemy 
-    ? (combat.enemyHealth / combat.currentEnemy.maxHealth) * 100 
+  const enemyHealthPercent = combat.currentEnemy
+    ? (combat.enemyHealth / combat.currentEnemy.maxHealth) * 100
     : 0;
-  
+
   return (
-    <div className="absolute top-4 left-4 right-4 flex justify-between items-start gap-4">
+    <div className="absolute top-4 left-4 right-4 flex justify-between items-start gap-4 z-20 pointer-events-none">
       {/* Player stats */}
-      <div className="flex flex-col gap-2 min-w-48">
-        <div className="flex items-center gap-2">
-          <div 
-            className="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center text-xs font-bold"
+      <HudPanel className="flex flex-col gap-3 min-w-48" style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)' }}>
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-full border-2 border-primary flex items-center justify-center text-lg font-bold shadow-lg"
             style={{ backgroundColor: character.color }}
           >
             {character.name[0]}
           </div>
-          <div className="flex-1">
-            <div className="text-sm font-semibold text-foreground">{character.name}</div>
-            <div className="text-xs text-muted-foreground">Lv. {progress.level}</div>
+          <div>
+            <div className="text-sm font-bold text-foreground tracking-wide">{character.name}</div>
+            <div className="text-xs text-muted-foreground tracking-widest uppercase">LVL {progress.level}</div>
           </div>
         </div>
-        
-        {/* Health bar */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-health font-semibold w-8">HP</span>
-          <div className="flex-1 h-4 bg-secondary rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-health transition-all duration-300"
-              style={{ width: `${healthPercent}%` }}
-            />
-          </div>
-          <span className="text-xs text-muted-foreground w-16 text-right">
-            {Math.ceil(combat.playerHealth)}/{character.stats.maxHealth}
-          </span>
+
+        <div className="flex flex-col gap-2 mt-2">
+          <StatDisplay icon={<Heart className="fill-current" />} value={Math.ceil(combat.playerHealth)} label="HP" accentColor="var(--health)" />
+          <StatDisplay icon={<Zap className="fill-current" />} value={Math.ceil(combat.playerMana)} label="MP" accentColor="var(--mana)" />
         </div>
-        
-        {/* Mana bar */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-mana font-semibold w-8">MP</span>
-          <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-mana transition-all duration-300"
-              style={{ width: `${manaPercent}%` }}
-            />
-          </div>
-          <span className="text-xs text-muted-foreground w-16 text-right">
-            {Math.ceil(combat.playerMana)}/{character.stats.maxMana}
-          </span>
-        </div>
-      </div>
-      
+      </HudPanel>
+
       {/* Combat stats */}
-      <div className="flex flex-col items-center gap-1 bg-card/80 backdrop-blur px-4 py-2 rounded-lg border border-border">
-        <div className="flex items-center gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">{combat.wpm}</div>
-            <div className="text-xs text-muted-foreground">WPM</div>
-          </div>
-          <div className="w-px h-8 bg-border" />
-          <div className="text-center">
-            <div className="text-2xl font-bold text-success">{combat.accuracy}%</div>
-            <div className="text-xs text-muted-foreground">Accuracy</div>
-          </div>
-          <div className="w-px h-8 bg-border" />
-          <div className="text-center">
-            <div className="text-2xl font-bold text-warning">{combat.combo}</div>
-            <div className="text-xs text-muted-foreground">Combo</div>
-          </div>
-        </div>
-      </div>
-      
+      <HudPanel className="flex items-center gap-6" style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)' }}>
+        <StatDisplay icon={<Activity />} value={combat.wpm} label="WPM" accentColor="var(--world-accent-color)" />
+        <StatDisplay icon={<Target />} value={combat.accuracy} label="ACC" accentColor="var(--correct-color)" />
+        <StatDisplay icon={<Flame className="fill-current" />} value={combat.combo} label="COMBO" accentColor="var(--warning)" />
+      </HudPanel>
+
       {/* Enemy stats */}
-      {combat.currentEnemy && (
-        <div className="flex flex-col gap-2 min-w-48 items-end">
-          <div className="flex items-center gap-2">
+      {combat.currentEnemy ? (
+        <HudPanel className="flex flex-col gap-3 min-w-48 items-end" style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)' }}>
+          <div className="flex items-center gap-3">
             <div className="text-right">
-              <div className="text-sm font-semibold text-foreground">{combat.currentEnemy.name}</div>
+              <div className="text-sm font-bold text-foreground tracking-wide">{combat.currentEnemy.name}</div>
               {combat.currentEnemy.title && (
-                <div className="text-xs text-muted-foreground">{combat.currentEnemy.title}</div>
+                <div className="text-xs text-muted-foreground tracking-widest uppercase">{combat.currentEnemy.title}</div>
               )}
             </div>
-            <div 
+            <div
               className={cn(
-                "w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold",
+                "w-10 h-10 rounded-full border-2 flex items-center justify-center text-lg font-bold shadow-lg",
                 combat.currentEnemy.isBoss ? "border-destructive" : "border-muted"
               )}
               style={{ backgroundColor: combat.currentEnemy.color }}
@@ -221,25 +189,11 @@ function StatBars() {
               {combat.currentEnemy.isBoss ? 'B' : 'E'}
             </div>
           </div>
-          
-          {/* Enemy health bar */}
-          <div className="flex items-center gap-2 w-full">
-            <span className="text-xs text-muted-foreground w-16">
-              {Math.ceil(combat.enemyHealth)}/{combat.currentEnemy.maxHealth}
-            </span>
-            <div className="flex-1 h-4 bg-secondary rounded-full overflow-hidden">
-              <div 
-                className={cn(
-                  "h-full transition-all duration-300",
-                  combat.currentEnemy.isBoss ? "bg-destructive" : "bg-orange-500"
-                )}
-                style={{ width: `${enemyHealthPercent}%` }}
-              />
-            </div>
-            <span className="text-xs text-health font-semibold w-8">HP</span>
+          <div className="w-full flex justify-end mt-2">
+            <StatDisplay icon={<Swords className="fill-current" />} value={Math.ceil(combat.enemyHealth)} label="HP" accentColor={combat.currentEnemy.isBoss ? 'var(--destructive)' : 'var(--wrong-color)'} />
           </div>
-        </div>
-      )}
+        </HudPanel>
+      ) : <div className="w-48" />}
     </div>
   );
 }
@@ -247,64 +201,43 @@ function StatBars() {
 // Typing input display
 function TypingDisplay() {
   const { combat, typeCharacter, enemyAttack } = useGameStore();
-  
+
   // Handle keyboard input
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!combat.isActive || !combat.currentWord) return;
-      
+
       // Ignore special keys
       if (e.key.length !== 1) return;
-      
+
       typeCharacter(e.key);
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [combat.isActive, combat.currentWord, typeCharacter]);
-  
+
   // Enemy attack timer
   useEffect(() => {
     if (!combat.isActive || !combat.currentEnemy) return;
-    
+
     const attackInterval = setInterval(() => {
       enemyAttack();
     }, 3000); // Enemy attacks every 3 seconds
-    
+
     return () => clearInterval(attackInterval);
   }, [combat.isActive, combat.currentEnemy, enemyAttack]);
-  
+
   if (!combat.currentWord) return null;
-  
+
   return (
-    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4">
-      {/* Word to type */}
-      <div className="bg-card/90 backdrop-blur border border-border rounded-xl px-8 py-4 shadow-lg">
-        <div className="text-4xl font-mono tracking-wider">
-          {combat.currentWord.split('').map((char, i) => (
-            <span
-              key={i}
-              className={cn(
-                "transition-colors duration-100",
-                i < combat.typedChars.length
-                  ? combat.typedChars[i]?.toLowerCase() === char.toLowerCase()
-                    ? "text-success"
-                    : "text-destructive"
-                  : i === combat.typedChars.length
-                    ? "text-primary underline"
-                    : "text-muted-foreground"
-              )}
-            >
-              {char}
-            </span>
-          ))}
-        </div>
+    <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col items-center gap-6 z-20 w-full pointer-events-none">
+      <WordDisplay word={combat.currentWord} typedChars={combat.typedChars} />
+      <div className="bg-background/40 backdrop-blur-md px-6 py-2 rounded-full border border-border/50">
+        <p className="text-sm text-foreground/80 tracking-wider">
+          Type the word to attack! Speed and accuracy increase damage.
+        </p>
       </div>
-      
-      {/* Instructions */}
-      <p className="text-sm text-muted-foreground">
-        Type the word to attack! Speed and accuracy increase damage.
-      </p>
     </div>
   );
 }
@@ -313,20 +246,20 @@ function TypingDisplay() {
 function AbilitiesBar() {
   const { combat, progress, useAbility } = useGameStore();
   const character = getCharacter(progress.currentCharacter);
-  
+
   if (!character) return null;
-  
+
   const availableAbilities = character.abilities.filter(a => a.requiredLevel <= progress.level);
-  
+
   return (
     <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex gap-2">
       {availableAbilities.map((ability, index) => {
         const isOnCooldown = combat.abilityCooldowns[ability.id] > Date.now();
-        const cooldownRemaining = isOnCooldown 
+        const cooldownRemaining = isOnCooldown
           ? Math.ceil((combat.abilityCooldowns[ability.id] - Date.now()) / 1000)
           : 0;
         const canAfford = combat.playerMana >= ability.manaCost;
-        
+
         return (
           <button
             key={ability.id}
@@ -343,14 +276,14 @@ function AbilitiesBar() {
           >
             <span className="text-lg font-bold">{index + 1}</span>
             <span className="text-xs truncate max-w-12">{ability.name.split(' ')[0]}</span>
-            
+
             {/* Cooldown overlay */}
             {isOnCooldown && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
                 <span className="text-lg font-bold">{cooldownRemaining}</span>
               </div>
             )}
-            
+
             {/* Mana cost indicator */}
             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-xs text-mana">
               {ability.manaCost}
@@ -365,12 +298,12 @@ function AbilitiesBar() {
 // Battle log
 function BattleLog() {
   const { combat } = useGameStore();
-  
+
   return (
     <div className="absolute bottom-4 left-4 w-64 max-h-32 overflow-y-auto bg-card/80 backdrop-blur rounded-lg border border-border p-2">
       <div className="text-xs space-y-1">
         {combat.battleLog.slice(-5).map((entry) => (
-          <div 
+          <div
             key={entry.id}
             className={cn(
               "opacity-80",
@@ -392,7 +325,7 @@ function BattleLog() {
 // Menu buttons
 function CombatMenu() {
   const { setScreen, combat } = useGameStore();
-  
+
   return (
     <div className="absolute top-4 right-4 flex gap-2">
       <button
@@ -417,26 +350,32 @@ function CombatMenu() {
 
 export function CombatView() {
   return (
-    <div className="relative w-full h-screen bg-background">
+    <div className="relative w-full h-screen bg-background overflow-hidden select-none">
+      {/* Cinematic Level Parallax Background */}
+      <ParallaxBackground />
+
       {/* 3D Canvas */}
       <Canvas
         shadows
         camera={{ position: [0, 3, 6], fov: 50 }}
-        className="absolute inset-0"
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 1 }}
       >
         <Suspense fallback={null}>
           <CombatScene />
         </Suspense>
       </Canvas>
-      
+
       {/* UI Overlay */}
-      <StatBars />
-      <TypingDisplay />
-      <AbilitiesBar />
-      <DamageNumbers />
-      <BattleLog />
-      <CombatMenu />
-      
+      <div className="absolute inset-0 z-10 pointer-events-auto">
+        <StatBars />
+        <TypingDisplay />
+        <AbilitiesBar />
+        <DamageNumbers />
+        <BattleLog />
+        <CombatMenu />
+      </div>
+
       {/* Floating animation keyframes */}
       <style jsx global>{`
         @keyframes floatUp {
