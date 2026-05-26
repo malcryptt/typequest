@@ -19,6 +19,35 @@ export function MainMenuView() {
     <div className="min-h-screen bg-background relative overflow-hidden flex flex-col">
       <ParallaxBackground />
 
+      {/* Lively Terrain Elements behind Main Menu */}
+      <svg
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="xMidYMid slice"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ zIndex: 1 }}
+      >
+        {/* Flowing River */}
+        <path d="M -5,30 C 20,55 55,20 110,60" fill="none" stroke="#1e40af" strokeWidth="4" opacity="0.2" />
+        <path d="M -5,30 C 20,55 55,20 110,60" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.4" />
+
+        {/* Tree clusters - corners */}
+        <circle cx="8" cy="12" r="5" fill="#166534" opacity="0.65" />
+        <circle cx="12" cy="9" r="3.5" fill="#15803d" opacity="0.75" />
+        <circle cx="6" cy="15" r="3" fill="#166534" opacity="0.6" />
+
+        <circle cx="88" cy="88" r="5.5" fill="#166534" opacity="0.65" />
+        <circle cx="93" cy="83" r="4" fill="#15803d" opacity="0.75" />
+        <circle cx="84" cy="92" r="3.5" fill="#166534" opacity="0.6" />
+
+        {/* Dotted horizon lines */}
+        <path d="M 0,40 Q 25,50 50,30 T 100,70" fill="none" stroke="#6d28d9" strokeWidth="0.7" strokeDasharray="2.5,3" opacity="0.45" />
+        <path d="M 0,75 Q 30,90 60,65 T 100,25" fill="none" stroke="#6d28d9" strokeWidth="0.5" strokeDasharray="3,4" opacity="0.25" />
+
+        {/* Ground hills */}
+        <path d="M 0,85 Q 15,75 35,88 T 70,85 T 110,88 L 110,100 L 0,100 Z" fill="#14532d" opacity="0.25" />
+      </svg>
+
       {/* Main Content */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-8">
         {/* Title */}

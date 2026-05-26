@@ -221,13 +221,60 @@ export function TownHubView() {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ background: "oklch(0.08 0.04 280)" }}>
-      {/* Background Ambience */}
+      {/* Background Ambience & Terrain Props */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 rounded-full blur-[120px] opacity-20" style={{ background: "oklch(0.55 0.18 145)" }} />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full blur-[140px] opacity-15" style={{ background: "oklch(0.55 0.15 45)" }} />
 
         {/* Soft ground gradient */}
         <div className="absolute bottom-0 left-0 right-0 h-1/2 opacity-30" style={{ background: "linear-gradient(to top, oklch(0.12 0.08 145), transparent)" }} />
+
+        {/* Lively Terrain Elements */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="xMidYMid slice"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* Flowing River - diagonal across screen */}
+          <path d="M -5,65 C 20,80 50,50 80,70 T 110,60" fill="none" stroke="#1e40af" strokeWidth="4" opacity="0.25" />
+          <path d="M -5,65 C 20,80 50,50 80,70 T 110,60" fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.45" />
+
+          {/* Tree clusters */}
+          {/* Top-left cluster */}
+          <circle cx="8" cy="18" r="4.5" fill="#166534" opacity="0.7" />
+          <circle cx="11" cy="15" r="3" fill="#15803d" opacity="0.8" />
+          <circle cx="6" cy="20" r="3" fill="#166534" opacity="0.65" />
+          {/* Mid-left */}
+          <circle cx="5" cy="42" r="5" fill="#166534" opacity="0.65" />
+          <circle cx="9" cy="38" r="3.5" fill="#15803d" opacity="0.75" />
+          {/* Top-right cluster */}
+          <circle cx="88" cy="22" r="5" fill="#166534" opacity="0.7" />
+          <circle cx="92" cy="18" r="3.5" fill="#15803d" opacity="0.8" />
+          <circle cx="85" cy="25" r="3" fill="#166534" opacity="0.6" />
+          {/* Bottom-right cluster */}
+          <circle cx="90" cy="80" r="5.5" fill="#166534" opacity="0.65" />
+          <circle cx="95" cy="75" r="4" fill="#15803d" opacity="0.75" />
+          <circle cx="86" cy="84" r="3.5" fill="#166534" opacity="0.6" />
+          {/* Extra scattered trees */}
+          <circle cx="30" cy="12" r="4" fill="#166534" opacity="0.55" />
+          <circle cx="65" cy="88" r="4.5" fill="#166534" opacity="0.6" />
+
+          {/* Dotted paths connecting NPC nodes */}
+          {/* Elder Oak (50%, 35%) → Sage Tower (75%, 50%) */}
+          <path d="M 50,35 Q 62,38 75,50" fill="none" stroke="#7c3aed" strokeWidth="0.8" strokeDasharray="2.5,2.5" opacity="0.6" />
+          {/* Elder Oak → Tavern (40%, 70%) */}
+          <path d="M 50,35 Q 46,52 40,70" fill="none" stroke="#7c3aed" strokeWidth="0.8" strokeDasharray="2.5,2.5" opacity="0.6" />
+          {/* Tavern → Blacksmith (25%, 55%) */}
+          <path d="M 40,70 Q 32,63 25,55" fill="none" stroke="#7c3aed" strokeWidth="0.8" strokeDasharray="2.5,2.5" opacity="0.6" />
+          {/* Tavern → Training (65%, 75%) */}
+          <path d="M 40,70 Q 52,78 65,75" fill="none" stroke="#7c3aed" strokeWidth="0.8" strokeDasharray="2.5,2.5" opacity="0.6" />
+          {/* Blacksmith → Elder Oak */}
+          <path d="M 25,55 Q 37,42 50,35" fill="none" stroke="#7c3aed" strokeWidth="0.8" strokeDasharray="2.5,2.5" opacity="0.4" />
+
+          {/* Distant hills silhouette at bottom */}
+          <path d="M 0,82 Q 12,72 30,85 T 60,82 T 90,87 T 110,84 L 110,100 L 0,100 Z" fill="#14532d" opacity="0.3" />
+        </svg>
       </div>
 
       {/* Top Bar */}
