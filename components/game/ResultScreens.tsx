@@ -7,17 +7,17 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export function LevelCompleteScreen() {
-  const { progress, combat, regions, setScreen } = useGameStore();
-  
+  const { progress, combat, regions, setScreen, statistics } = useGameStore();
+
   const character = getCharacter(progress.currentCharacter);
   const region = regions.find(r => r.levels.some(l => l.id === progress.currentLevel));
   const level = region?.levels.find(l => l.id === progress.currentLevel);
-  
+
   if (!level || !character) return null;
-  
+
   // Calculate stars based on accuracy
   const stars = combat.accuracy >= 95 ? 3 : combat.accuracy >= 80 ? 2 : 1;
-  
+
   return (
     <div className="fixed inset-0 bg-background/95 backdrop-blur flex items-center justify-center z-50">
       <div className="max-w-lg w-full mx-4 bg-card border border-border rounded-2xl p-8 shadow-2xl">
@@ -26,7 +26,7 @@ export function LevelCompleteScreen() {
           <h1 className="text-4xl font-bold text-primary mb-2">Victory!</h1>
           <p className="text-muted-foreground">{level.name} Completed</p>
         </div>
-        
+
         {/* Stars */}
         <div className="flex justify-center gap-2 mb-8">
           {[1, 2, 3].map((star) => (
@@ -34,11 +34,11 @@ export function LevelCompleteScreen() {
               key={star}
               className={cn(
                 "w-12 h-12 transition-all duration-500",
-                star <= stars 
-                  ? "text-warning scale-110" 
+                star <= stars
+                  ? "text-warning scale-110"
                   : "text-muted scale-90 opacity-30"
               )}
-              style={{ 
+              style={{
                 animationDelay: `${star * 0.2}s`,
                 animation: star <= stars ? 'starPop 0.5s ease-out forwards' : 'none'
               }}
@@ -49,7 +49,7 @@ export function LevelCompleteScreen() {
             </div>
           ))}
         </div>
-        
+
         {/* Stats Summary */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="bg-secondary/50 rounded-lg p-4 text-center">
@@ -65,11 +65,11 @@ export function LevelCompleteScreen() {
             <div className="text-sm text-muted-foreground">Max Combo</div>
           </div>
           <div className="bg-secondary/50 rounded-lg p-4 text-center">
-            <div className="text-3xl font-bold text-foreground">{progress.statistics.totalDamageDealt}</div>
+            <div className="text-3xl font-bold text-foreground">{statistics.totalDamageDealt}</div>
             <div className="text-sm text-muted-foreground">Total Damage</div>
           </div>
         </div>
-        
+
         {/* Rewards */}
         <div className="mb-8">
           <h3 className="text-lg font-semibold mb-4 text-center">Rewards</h3>
@@ -87,7 +87,7 @@ export function LevelCompleteScreen() {
               <span className="text-lg font-semibold">+{level.rewards.experience}</span>
             </div>
           </div>
-          
+
           {/* Item rewards */}
           {level.rewards.items && level.rewards.items.length > 0 && (
             <div className="mt-4">
@@ -109,13 +109,13 @@ export function LevelCompleteScreen() {
             </div>
           )}
         </div>
-        
+
         {/* Actions */}
         <div className="flex gap-4">
           <Button
             variant="outline"
             className="flex-1"
-            onClick={() => setScreen('world-map')}
+            onClick={() => setScreen('worldMap')}
           >
             Return to Map
           </Button>
@@ -133,7 +133,7 @@ export function LevelCompleteScreen() {
           </Button>
         </div>
       </div>
-      
+
       {/* Star animation styles */}
       <style jsx global>{`
         @keyframes starPop {
@@ -156,11 +156,11 @@ export function LevelCompleteScreen() {
 
 export function GameOverScreen() {
   const { progress, combat, regions, setScreen, saveGame } = useGameStore();
-  
+
   const character = getCharacter(progress.currentCharacter);
   const region = regions.find(r => r.levels.some(l => l.id === progress.currentLevel));
   const level = region?.levels.find(l => l.id === progress.currentLevel);
-  
+
   return (
     <div className="fixed inset-0 bg-background/95 backdrop-blur flex items-center justify-center z-50">
       <div className="max-w-lg w-full mx-4 bg-card border border-destructive/50 rounded-2xl p-8 shadow-2xl">
@@ -171,14 +171,14 @@ export function GameOverScreen() {
             {combat.currentEnemy?.name || 'The enemy'} was too powerful...
           </p>
         </div>
-        
+
         {/* Skull icon */}
         <div className="flex justify-center mb-8">
           <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center">
-            <svg 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
               strokeWidth="2"
               className="w-12 h-12 text-destructive"
             >
@@ -191,7 +191,7 @@ export function GameOverScreen() {
             </svg>
           </div>
         </div>
-        
+
         {/* Stats Summary */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="bg-secondary/50 rounded-lg p-4 text-center">
@@ -203,21 +203,21 @@ export function GameOverScreen() {
             <div className="text-sm text-muted-foreground">Accuracy</div>
           </div>
         </div>
-        
+
         {/* Tip */}
         <div className="bg-muted/50 rounded-lg p-4 mb-8 text-center">
           <p className="text-sm text-muted-foreground">
-            <strong>Tip:</strong> Try upgrading your equipment in the shop, 
+            <strong>Tip:</strong> Try upgrading your equipment in the shop,
             or practice to improve your typing speed and accuracy!
           </p>
         </div>
-        
+
         {/* Actions */}
         <div className="flex gap-4">
           <Button
             variant="outline"
             className="flex-1"
-            onClick={() => setScreen('world-map')}
+            onClick={() => setScreen('worldMap')}
           >
             Return to Map
           </Button>

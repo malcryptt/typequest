@@ -1,5 +1,11 @@
-import { NPC } from "./types";
+import type { DialogueNode } from "./types";
 
+export interface NPC {
+  id: string;
+  name: string;
+  portrait?: string;
+  dialogues: Record<string, any>;
+}
 export const NPCS: Record<string, NPC> = {
   elder_oak: {
     id: "elder_oak",
@@ -95,7 +101,7 @@ export const NPCS: Record<string, NPC> = {
       },
     },
   },
-  
+
   blacksmith_forge: {
     id: "blacksmith_forge",
     name: "Forge the Blacksmith",
@@ -334,7 +340,7 @@ export const NPCS: Record<string, NPC> = {
 export function getInitialDialogue(npcId: string, hasMetBefore: boolean): string {
   const npc = NPCS[npcId];
   if (!npc) return "intro";
-  
+
   if (hasMetBefore && npc.dialogues.returning) {
     return "returning";
   }

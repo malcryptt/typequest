@@ -3,7 +3,8 @@
 import { useGameStore } from "@/lib/game/store";
 import { NPCS, getInitialDialogue } from "@/lib/game/dialogues";
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, MessageSquareText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DialogueViewProps {
@@ -28,10 +29,8 @@ export function DialogueView({ npcId, onClose }: DialogueViewProps) {
 
   const currentDialogue = npc?.dialogues[currentDialogueId];
 
-  // Typewriter effect
   useEffect(() => {
     if (!currentDialogue) return;
-
     setDisplayedText("");
     setIsTyping(true);
     setShowResponses(false);
@@ -48,7 +47,7 @@ export function DialogueView({ npcId, onClose }: DialogueViewProps) {
         setShowResponses(true);
         clearInterval(interval);
       }
-    }, 25);
+    }, 20); // slightly faster typing
 
     return () => clearInterval(interval);
   }, [currentDialogue]);
@@ -66,7 +65,6 @@ export function DialogueView({ npcId, onClose }: DialogueViewProps) {
     nextDialogueId: string | null;
     action?: { type: string; itemId?: string; quantity?: number; questId?: string };
   }) => {
-    // Handle actions
     if (response.action) {
       switch (response.action.type) {
         case "giveItem":
@@ -80,113 +78,100 @@ export function DialogueView({ npcId, onClose }: DialogueViewProps) {
           return;
         case "startPractice":
           recordNpcInteraction(npcId);
-          // Go to a practice level
           setGameState("worldMap");
           return;
-        case "startQuest":
-          // Quest tracking could be added here
-          break;
       }
     }
 
     if (response.nextDialogueId) {
       setCurrentDialogueId(response.nextDialogueId);
     } else {
-      // End conversation
       recordNpcInteraction(npcId);
       onClose();
     }
   };
 
-  if (!npc || !currentDialogue) {
-    return (
-      <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-        <div className="bg-card rounded-xl p-6 text-center">
-          <p className="text-foreground">NPC not found</p>
-          <Button onClick={onClose} className="mt-4">
-            Close
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  if (!npc || !currentDialogue) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-end justify-center p-4 z-50">
-      <div
-        className="w-full max-w-4xl bg-gradient-to-b from-card to-card/95 border border-border rounded-t-2xl overflow-hidden shadow-2xl"
-        onClick={handleSkipTyping}
-      >
+    <motion.div className="fixed inset-0 z-50 flex items-end justify-center"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      {/* Dim backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleSkipTyping} />
+
+      {/* Dialogue Window */}
+      <motion.div className="relative w-full max-w-4xl z-10 flex flex-col"
+        initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "20%", opacity: 0 }}
+        transition={{ type: "spring", stiffness: 200, damping: 25 }}
+        style={{
+          background: "oklch(0.12 0.04 280 / 0.95)",
+          border: "1px solid oklch(0.28 0.08 280 / 0.6)",
+          borderBottom: "none",
+          borderRadius: "32px 32px 0 0",
+          backdropFilter: "blur(24px)",
+          boxShadow: "0 -20px 80px oklch(0.05 0.04 280 / 0.8)",
+        }}
+        onClick={handleSkipTyping}>
+
+        {/* Glow effect matching NPC */}
+        <div className="absolute top-0 left-12 w-64 h-32 rounded-full blur-[80px] opacity-20 pointer-events-none" style={{ background: "oklch(0.55 0.18 145)" }} />
+
         {/* NPC Header */}
-        <div className="bg-muted/50 px-6 py-4 flex items-center gap-4 border-b border-border">
-          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-4xl border-2 border-primary/30">
+        <div className="flex items-center gap-5 px-8 pt-6 pb-4" style={{ borderBottom: "1px solid oklch(0.3 0.06 280 / 0.3)" }}>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-4xl"
+            style={{
+              background: "oklch(0.16 0.04 280 / 0.8)",
+              border: "1px solid oklch(0.35 0.08 280)",
+              boxShadow: "0 0 20px oklch(0.35 0.08 280 / 0.3)"
+            }}>
             {npc.portrait}
           </div>
           <div>
-            <h2 className="text-xl font-bold text-foreground">{npc.name}</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">{npc.name}</h2>
+            <p className="text-sm font-medium" style={{ color: "oklch(0.7 0.12 145)" }}>
               {hasMetBefore ? "An old acquaintance" : "First meeting"}
             </p>
           </div>
         </div>
 
         {/* Dialogue Text */}
-        <div className="px-6 py-6 min-h-[120px]">
-          <p className="text-lg text-foreground leading-relaxed">
-            {displayedText}
-            {isTyping && <span className="animate-pulse">|</span>}
-          </p>
+        <div className="px-10 py-6 min-h-[140px] flex items-start text-lg leading-relaxed text-foreground">
+          <p>{displayedText}{isTyping && <span className="animate-pulse">_</span>}</p>
         </div>
 
-        {/* Response Options */}
-        <div className="px-6 pb-6 space-y-2">
-          {showResponses &&
-            currentDialogue.responses.map((response, index) => (
-              <button
-                key={index}
-                onClick={() => handleResponse(response)}
-                className={cn(
-                  "w-full text-left px-4 py-3 rounded-lg border transition-all",
-                  "bg-muted/30 border-border hover:bg-primary/20 hover:border-primary/50",
-                  "text-foreground hover:text-primary"
-                )}
-              >
-                <span className="text-muted-foreground mr-2">{index + 1}.</span>
-                {response.text}
-                {response.action?.type === "giveItem" && (
-                  <span className="ml-2 text-xs text-amber-400">
-                    (Receive item)
-                  </span>
-                )}
-                {response.action?.type === "openShop" && (
-                  <span className="ml-2 text-xs text-primary">
-                    (Open shop)
-                  </span>
-                )}
-              </button>
-            ))}
-
-          {!showResponses && (
-            <p className="text-center text-muted-foreground text-sm">
-              Click to skip...
-            </p>
-          )}
+        {/* Responses Area */}
+        <div className="px-8 pb-8 space-y-3">
+          <AnimatePresence>
+            {showResponses ? (
+              currentDialogue.responses.map((response: any, index: number) => (
+                <motion.button
+                  key={index}
+                  initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  onClick={(e) => { e.stopPropagation(); handleResponse(response); }}
+                  className="w-full text-left px-5 py-3.5 rounded-xl transition-all group flex items-center gap-3"
+                  style={{ background: "oklch(0.15 0.04 280 / 0.6)", border: "1px solid oklch(0.3 0.06 280 / 0.5)" }}
+                  whileHover={{ scale: 1.01, background: "oklch(0.2 0.06 280 / 0.8)", borderColor: "oklch(0.4 0.1 280)" }}
+                  whileTap={{ scale: 0.98 }}>
+                  <MessageSquareText size={18} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                  <span className="flex-1 text-foreground font-medium">{response.text}</span>
+                  {response.action?.type === "giveItem" && <span className="text-xs bg-amber-500/20 text-amber-300 font-bold px-2 py-1 rounded">Gain Item</span>}
+                  {response.action?.type === "openShop" && <span className="text-xs bg-emerald-500/20 text-emerald-300 font-bold px-2 py-1 rounded">Open Shop</span>}
+                </motion.button>
+              ))
+            ) : (
+              <p className="text-center text-muted-foreground text-sm flex items-center justify-center gap-2 animate-pulse mt-4">
+                Click anywhere to skip
+              </p>
+            )}
+          </AnimatePresence>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
-// NPC Component for World Map
-export function NPCMarker({
-  npcId,
-  position,
-  onClick,
-}: {
-  npcId: string;
-  position: { x: number; y: number };
-  onClick: () => void;
-}) {
+function NPCMarker({ npcId, position, onClick }: { npcId: string; position: { x: number; y: number }; onClick: () => void; }) {
   const npc = NPCS[npcId];
   const { npcInteractions } = useGameStore();
   const hasNewDialogue = !npcInteractions[npcId];
@@ -194,111 +179,83 @@ export function NPCMarker({
   if (!npc) return null;
 
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "absolute transform -translate-x-1/2 -translate-y-1/2",
-        "w-12 h-12 rounded-full flex items-center justify-center",
-        "bg-card border-2 border-primary/50 shadow-lg",
-        "hover:scale-110 hover:border-primary transition-all",
-        "text-2xl"
-      )}
-      style={{ left: `${position.x}%`, top: `${position.y}%` }}
-    >
+    <motion.button onClick={onClick} whileHover={{ scale: 1.15, y: -4 }} whileTap={{ scale: 0.95 }}
+      className="absolute transform -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full flex items-center justify-center text-3xl"
+      style={{
+        left: `${position.x}%`, top: `${position.y}%`,
+        background: "oklch(0.14 0.04 280 / 0.9)",
+        border: hasNewDialogue ? "2px solid oklch(0.6 0.22 45)" : "1px solid oklch(0.3 0.06 280)",
+        boxShadow: hasNewDialogue ? "0 0 24px oklch(0.6 0.22 45 / 0.5)" : "0 4px 12px rgba(0,0,0,0.5)"
+      }}>
       {npc.portrait}
       {hasNewDialogue && (
-        <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full animate-pulse" />
+        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full animate-bounce" style={{ background: "oklch(0.7 0.22 45)" }} />
       )}
-    </button>
+    </motion.button>
   );
 }
 
-// Hub area with NPCs
 export function TownHubView() {
   const [activeNpc, setActiveNpc] = useState<string | null>(null);
   const { setGameState, player } = useGameStore();
 
   const npcs = [
-    { id: "elder_oak", position: { x: 50, y: 30 } },
-    { id: "blacksmith_forge", position: { x: 25, y: 50 } },
-    { id: "mysterious_sage", position: { x: 75, y: 45 } },
-    { id: "tavern_keeper", position: { x: 40, y: 65 } },
-    { id: "training_dummy", position: { x: 60, y: 70 } },
+    { id: "elder_oak", position: { x: 50, y: 35 }, label: "Town Square" },
+    { id: "blacksmith_forge", position: { x: 25, y: 55 }, label: "Blacksmith" },
+    { id: "mysterious_sage", position: { x: 75, y: 50 }, label: "Sage Tower" },
+    { id: "tavern_keeper", position: { x: 40, y: 70 }, label: "Tavern" },
+    { id: "training_dummy", position: { x: 65, y: 75 }, label: "Training" },
   ];
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/20 via-background to-background" />
-      
-      {/* Decorative elements */}
+    <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ background: "oklch(0.08 0.04 280)" }}>
+      {/* Background Ambience */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-10 left-10 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-20 w-48 h-48 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-96 h-96 rounded-full blur-[120px] opacity-20" style={{ background: "oklch(0.55 0.18 145)" }} />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full blur-[140px] opacity-15" style={{ background: "oklch(0.55 0.15 45)" }} />
+
+        {/* Soft ground gradient */}
+        <div className="absolute bottom-0 left-0 right-0 h-1/2 opacity-30" style={{ background: "linear-gradient(to top, oklch(0.12 0.08 145), transparent)" }} />
       </div>
 
-      {/* Header */}
-      <header className="relative z-10 p-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Starter Village</h1>
-          <p className="text-muted-foreground text-sm">
-            {player?.name} - Level {player?.level}
-          </p>
+      {/* Top Bar */}
+      <div className="relative z-20 px-4 pt-4 pb-3 flex items-center gap-3"
+        style={{ background: "oklch(0.1 0.04 280 / 0.8)", borderBottom: "1px solid oklch(0.25 0.06 280 / 0.4)", backdropFilter: "blur(16px)" }}>
+        <button onClick={() => setGameState("worldMap")} className="w-10 h-10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" style={{ background: "oklch(0.16 0.04 280 / 0.6)" }}>
+          <ArrowLeft size={20} />
+        </button>
+        <div className="flex-1">
+          <h1 className="text-lg font-bold text-foreground">Starter Village</h1>
+          <p className="text-xs text-muted-foreground">{player?.name} · Lv.{player?.level}</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setGameState("inventory")}>
-            Inventory
-          </Button>
-          <Button variant="outline" onClick={() => setGameState("worldMap")}>
-            World Map
-          </Button>
-        </div>
-      </header>
+      </div>
 
       {/* Town Area */}
-      <div className="relative mx-auto max-w-4xl h-[600px] mt-8">
-        {/* Ground/Path decoration */}
-        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-amber-900/10 to-transparent rounded-t-full" />
-        
-        {/* Buildings/Areas Labels */}
-        <div className="absolute top-[20%] left-1/2 -translate-x-1/2 text-center">
-          <span className="text-xs text-muted-foreground bg-card/50 px-2 py-1 rounded">Town Square</span>
+      <div className="relative flex-1 max-w-5xl mx-auto w-full flex items-center justify-center mt-12 mb-20 z-10">
+        <div className="relative w-full h-[600px]">
+          {/* NPC Nodes */}
+          {npcs.map((npc) => (
+            <div key={npc.id}>
+              <div className="absolute text-center" style={{ left: `${npc.position.x}%`, top: `${npc.position.y - 10}%`, transform: "translateX(-50%)" }}>
+                <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: "oklch(0.12 0.04 280 / 0.8)", border: "1px solid oklch(0.25 0.06 280 / 0.5)", color: "oklch(0.6 0.08 280)" }}>
+                  {npc.label}
+                </span>
+              </div>
+              <NPCMarker npcId={npc.id} position={npc.position} onClick={() => setActiveNpc(npc.id)} />
+            </div>
+          ))}
         </div>
-        <div className="absolute top-[45%] left-[15%] text-center">
-          <span className="text-xs text-muted-foreground bg-card/50 px-2 py-1 rounded">Blacksmith</span>
-        </div>
-        <div className="absolute top-[40%] right-[15%] text-center">
-          <span className="text-xs text-muted-foreground bg-card/50 px-2 py-1 rounded">Sage Tower</span>
-        </div>
-        <div className="absolute top-[58%] left-[30%] text-center">
-          <span className="text-xs text-muted-foreground bg-card/50 px-2 py-1 rounded">Tavern</span>
-        </div>
-        <div className="absolute top-[63%] right-[30%] text-center">
-          <span className="text-xs text-muted-foreground bg-card/50 px-2 py-1 rounded">Training Grounds</span>
-        </div>
-
-        {/* NPCs */}
-        {npcs.map((npc) => (
-          <NPCMarker
-            key={npc.id}
-            npcId={npc.id}
-            position={npc.position}
-            onClick={() => setActiveNpc(npc.id)}
-          />
-        ))}
       </div>
 
-      {/* Instructions */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-center">
-        <p className="text-muted-foreground text-sm">
-          Click on characters to interact with them
-        </p>
-      </div>
+      <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-sm font-semibold tracking-wide uppercase opacity-40 z-10" style={{ color: "oklch(0.8 0.05 280)" }}>
+        Tap characters to interact
+      </p>
 
       {/* Active Dialogue */}
-      {activeNpc && (
-        <DialogueView npcId={activeNpc} onClose={() => setActiveNpc(null)} />
-      )}
+      <AnimatePresence>
+        {activeNpc && <DialogueView npcId={activeNpc} onClose={() => setActiveNpc(null)} />}
+      </AnimatePresence>
     </div>
   );
 }

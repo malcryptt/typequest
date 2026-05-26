@@ -1,8 +1,9 @@
 // Main Game Store using Zustand - Unified Implementation
 import { create } from 'zustand';
 import { CHARACTERS, CharacterData } from './characters';
-import { REGIONS, LevelData } from './regions';
-import { ITEMS, Item } from './items';
+import { REGIONS } from './regions';
+import type { Level, Item } from './types';
+import { ITEMS } from './items';
 import { EnemyData, getRandomWord, ENEMIES } from './enemies';
 
 // Game State Types
@@ -106,7 +107,7 @@ interface GameStore {
     accessory: string | null;
   };
   regionProgress: RegionProgress;
-  currentLevel: LevelData | null;
+  currentLevel: Level | null;
   currentRegion: string;
   npcInteractions: Record<string, number>;
   statistics: Statistics;
@@ -281,7 +282,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     if (!state.player) return;
 
     // Find the level
-    let foundLevel: LevelData | null = null;
+    let foundLevel: Level | null = null;
     let foundRegion: typeof REGIONS[0] | null = null;
 
     for (const region of REGIONS) {
@@ -296,8 +297,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     if (!foundLevel || !foundRegion) return;
 
     // Get first enemy
-    const firstEnemyId = foundLevel.enemies[0];
-    const firstEnemy = ENEMIES[firstEnemyId];
+    const firstEnemy = foundLevel.enemies[0];
     if (!firstEnemy) return;
 
     set({
@@ -526,8 +526,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       return;
     }
 
-    const nextEnemyId = state.currentLevel.enemies[nextIndex];
-    const nextEnemy = ENEMIES[nextEnemyId];
+    const nextEnemy = state.currentLevel.enemies[nextIndex];
     if (!nextEnemy) return;
 
     set({
@@ -565,7 +564,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       get().completeLevel(state.currentLevel.id, stars);
 
       // Add reward items
-      state.currentLevel.rewards.items?.forEach(itemId => {
+      state.currentLevel.rewards.items?.forEach((itemId: string) => {
         get().addItem(itemId);
       });
 
@@ -619,12 +618,12 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
   equipItem: (itemId) => {
     const item = ITEMS[itemId];
-    if (!item || !item.slot) return;
+    if (!item || !item.type) return;
 
     set((state) => ({
       equipment: {
         ...state.equipment,
-        [item.slot as string]: itemId,
+        [item.type as string]: itemId,
       },
     }));
   },
@@ -644,8 +643,9 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     if (!item || item.type !== 'consumable' || !state.player) return;
 
     // Apply effect
-    if (item.effect === 'heal' && item.effectValue) {
-      const newHp = Math.min(state.player.maxHp, state.player.hp + item.effectValue);
+    if (item.effect && item.effect.startsWith('heal:')) {
+      const effectValue = parseInt(item.effect.split(':')[1] || '0', 10);
+      const newHp = Math.min(state.player.maxHp, state.player.hp + effectValue);
       set({ player: { ...state.player, hp: newHp } });
     }
 
@@ -705,20 +705,37 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       const regionProg = state.regionProgress[regionId];
       const existingStars = regionProg.levelStars[levelId] || 0;
 
-      return {
-        regionProgress: {
-          ...state.regionProgress,
-          [regionId]: {
-            ...regionProg,
-            completedLevels: regionProg.completedLevels.includes(levelId)
-              ? regionProg.completedLevels
-              : [...regionProg.completedLevels, levelId],
-            levelStars: {
-              ...regionProg.levelStars,
-              [levelId]: Math.max(existingStars, stars),
-            },
-          },
+      const newCompletedLevels = regionProg.completedLevels.includes(levelId)
+        ? regionProg.completedLevels
+        : [...regionProg.completedLevels, levelId];
+
+      const currentRegion = REGIONS.find(r => r.id === regionId);
+      const newRegionProgress = { ...state.regionProgress };
+
+      newRegionProgress[regionId] = {
+        ...regionProg,
+        completedLevels: newCompletedLevels,
+        levelStars: {
+          ...regionProg.levelStars,
+          [levelId]: Math.max(existingStars, stars),
         },
+      };
+
+      // Check for region completion and unlock next regions based on map paths
+      if (currentRegion && newCompletedLevels.length >= currentRegion.levels.length) {
+        if (regionId === 'verdant-vale' && newRegionProgress['misty-marshes'])
+          newRegionProgress['misty-marshes'].unlocked = true;
+        if (regionId === 'misty-marshes') {
+          if (newRegionProgress['frostpeak']) newRegionProgress['frostpeak'].unlocked = true;
+          if (newRegionProgress['shadow-citadel']) newRegionProgress['shadow-citadel'].unlocked = true;
+        }
+        if ((regionId === 'frostpeak' || regionId === 'shadow-citadel') && newRegionProgress['dragons-peak']) {
+          newRegionProgress['dragons-peak'].unlocked = true;
+        }
+      }
+
+      return {
+        regionProgress: newRegionProgress,
       };
     });
   },

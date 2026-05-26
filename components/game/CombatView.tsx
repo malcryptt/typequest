@@ -61,7 +61,7 @@ function CombatScene() {
 
       {/* Player character */}
       <LowPolyCharacter
-        characterClass={progress.currentCharacter}
+        characterClass={progress.currentCharacter as any}
         position={[-1.5, 0, 1]}
         rotation={[0, 0.3, 0]}
         scale={1.2}
@@ -128,13 +128,13 @@ function DamageNumbers() {
 
 // Health and mana bars
 function StatBars() {
-  const { combat, progress } = useGameStore();
+  const { combat, progress, player } = useGameStore();
   const character = getCharacter(progress.currentCharacter);
 
-  if (!character) return null;
+  if (!character || !player) return null;
 
-  const healthPercent = (combat.playerHealth / character.stats.maxHealth) * 100;
-  const manaPercent = (combat.playerMana / character.stats.maxMana) * 100;
+  const healthPercent = (combat.playerHealth / player.maxHp) * 100;
+  const manaPercent = (combat.playerMana / player.maxMp) * 100;
   const enemyHealthPercent = combat.currentEnemy
     ? (combat.enemyHealth / combat.currentEnemy.maxHealth) * 100
     : 0;
