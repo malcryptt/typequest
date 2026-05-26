@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ParallaxBackground } from "./cinematic/parallax-background";
+import { motion, AnimatePresence } from "framer-motion";
 
 export function MainMenuView() {
   const { setGameState, loadGame, hasSavedGame, statistics } = useGameStore();
@@ -157,153 +158,167 @@ function CharacterSelection({ onBack }: { onBack: () => void }) {
     setGameState("townHub");
   };
 
-  return (
-    <div className="w-full max-w-4xl">
-      <Button variant="ghost" onClick={onBack} className="mb-6">
-        Back to Menu
-      </Button>
+  const getStatColor = (val: number, max: number) => {
+    const ratio = val / max;
+    if (ratio >= 0.8) return "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]";
+    if (ratio >= 0.5) return "bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.8)]";
+    return "bg-rose-400 shadow-[0_0_10px_rgba(251,113,133,0.8)]";
+  };
 
-      <h2 className="text-3xl font-bold text-foreground mb-2">Choose Your Hero</h2>
-      <p className="text-muted-foreground mb-8">
-        Each hero has unique stats and abilities. Choose wisely!
-      </p>
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.4 }}
+      className="w-full max-w-6xl flex flex-col items-center"
+    >
+      <div className="w-full flex justify-between items-center mb-8">
+        <Button variant="ghost" onClick={onBack} className="text-foreground/70 hover:text-foreground">
+          ← Back to Menu
+        </Button>
+        <div className="text-center">
+          <h2 className="text-4xl font-extrabold tracking-tight" style={{ fontFamily: 'Cinzel, serif', textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Choose Your Hero</h2>
+          <p className="text-primary/80 mt-1 uppercase tracking-[0.2em] font-semibold text-sm">Destiny Awaits</p>
+        </div>
+        <div className="w-[110px]" /> {/* Spacer to balance flex layout */}
+      </div>
 
       {/* Name Input */}
-      <div className="mb-8">
-        <label className="block text-sm font-medium text-foreground mb-2">
-          Your Name
-        </label>
-        <input
-          type="text"
-          value={playerName}
-          onChange={(e) => setPlayerName(e.target.value)}
-          placeholder="Enter your hero's name..."
-          className="w-full max-w-sm px-4 py-3 rounded-lg bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          maxLength={20}
-        />
+      <div className="mb-10 w-full max-w-md">
+        <div className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/50 to-primary/30 rounded-xl blur opacity-30 group-focus-within:opacity-100 transition duration-500"></div>
+          <input
+            type="text"
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            placeholder="Enter Hero's Name..."
+            className="relative w-full px-6 py-4 rounded-xl bg-background/80 backdrop-blur-xl border border-primary/20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 text-center text-xl font-bold tracking-wider uppercase transition-all"
+            maxLength={20}
+          />
+        </div>
       </div>
 
       {/* Character Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {characters.map((char) => (
-          <button
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full mb-12">
+        {characters.map((char, index) => (
+          <motion.div
             key={char.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1, duration: 0.4 }}
             onClick={() => setSelectedCharacter(char.id)}
             className={cn(
-              "p-4 rounded-xl border-2 transition-all text-left",
-              "bg-card hover:bg-muted/50",
-              selectedCharacter === char.id
-                ? "border-primary ring-2 ring-primary/30"
-                : "border-border hover:border-primary/50"
+              "relative cursor-pointer rounded-2xl overflow-hidden transition-all duration-300",
+              selectedCharacter === char.id ? "scale-[1.02] shadow-[0_0_30px_rgba(200,150,50,0.2)]" : "hover:scale-[1.01] hover:shadow-xl opacity-80 hover:opacity-100"
             )}
           >
-            {/* Character Icon */}
-            <div
-              className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center text-3xl"
-              style={{ backgroundColor: `${char.color}20` }}
-            >
-              {char.id === "knight" && "⚔️"}
-              {char.id === "mage" && "🔮"}
-              {char.id === "rogue" && "🗡️"}
-              {char.id === "ranger" && "🏹"}
-            </div>
+            {/* Outline Glow for Selected */}
+            <div className={cn(
+              "absolute inset-0 border-2 rounded-2xl transition-all duration-300 pointer-events-none z-10",
+              selectedCharacter === char.id ? "border-primary shadow-[inset_0_0_20px_rgba(200,150,50,0.2)]" : "border-border/30"
+            )} />
 
-            <h3 className="font-bold text-foreground text-center">{char.name}</h3>
-            <p className="text-xs text-muted-foreground text-center mb-3">
-              {char.description}
-            </p>
+            {/* Background Panel */}
+            <div className="absolute inset-0 bg-card/60 backdrop-blur-md" />
 
-            {/* Stats */}
-            <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">HP</span>
-                <div className="flex gap-0.5">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "w-2 h-2 rounded-full",
-                        i < Math.ceil(char.baseStats.hp / 25)
-                          ? "bg-green-500"
-                          : "bg-muted"
-                      )}
-                    />
-                  ))}
-                </div>
+            <div className="relative p-6 z-20 flex flex-col items-center h-full">
+              {/* Icon / Avatar */}
+              <div
+                className="w-20 h-20 rounded-full mb-4 flex items-center justify-center text-4xl shadow-inner border border-primary/20"
+                style={{ backgroundColor: `${char.color}15`, boxShadow: `inset 0 0 20px ${char.color}20` }}
+              >
+                {char.id === "knight" && "⚔️"}
+                {char.id === "mage" && "🔮"}
+                {char.id === "rogue" && "🗡️"}
+                {char.id === "ranger" && "🏹"}
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ATK</span>
-                <div className="flex gap-0.5">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "w-2 h-2 rounded-full",
-                        i < Math.ceil(char.baseStats.attack / 4)
-                          ? "bg-red-500"
-                          : "bg-muted"
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">DEF</span>
-                <div className="flex gap-0.5">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "w-2 h-2 rounded-full",
-                        i < Math.ceil(char.baseStats.defense / 3)
-                          ? "bg-blue-500"
-                          : "bg-muted"
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">SPD</span>
-                <div className="flex gap-0.5">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "w-2 h-2 rounded-full",
-                        i < Math.ceil(char.baseStats.speed / 4)
-                          ? "bg-amber-500"
-                          : "bg-muted"
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
 
-            {/* Ability Preview */}
-            <div className="mt-3 pt-3 border-t border-border">
-              <p className="text-xs text-primary">{char.abilities[0].name}</p>
-              <p className="text-xs text-muted-foreground line-clamp-2">
-                {char.abilities[0].description}
+              <h3 className="text-2xl font-bold tracking-tight mb-1" style={{ fontFamily: 'Cinzel, serif' }}>{char.name}</h3>
+              <p className="text-primary italic text-xs mb-4">{char.title}</p>
+
+              <p className="text-sm text-foreground/70 text-center mb-6 flex-grow leading-relaxed">
+                {char.description}
               </p>
+
+              {/* Stats Block */}
+              <div className="w-full space-y-3 bg-background/40 rounded-xl p-4 border border-border/40">
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground w-6">HP</span>
+                  <div className="flex-grow h-1.5 bg-background/50 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(char.baseStats.hp / 120) * 100}%` }}
+                      transition={{ delay: index * 0.1 + 0.3, duration: 0.6, ease: "easeOut" }}
+                      className={cn("h-full rounded-full", getStatColor(char.baseStats.hp, 120))}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground w-6">ATK</span>
+                  <div className="flex-grow h-1.5 bg-background/50 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(char.baseStats.attack / 20) * 100}%` }}
+                      transition={{ delay: index * 0.1 + 0.4, duration: 0.6, ease: "easeOut" }}
+                      className={cn("h-full rounded-full", getStatColor(char.baseStats.attack, 20))}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground w-6">DEF</span>
+                  <div className="flex-grow h-1.5 bg-background/50 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(char.baseStats.defense / 15) * 100}%` }}
+                      transition={{ delay: index * 0.1 + 0.5, duration: 0.6, ease: "easeOut" }}
+                      className={cn("h-full rounded-full", getStatColor(char.baseStats.defense, 15))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Ability Preview */}
+              <div className="w-full mt-4 pt-4 border-t border-border/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                  <p className="text-xs font-bold text-primary tracking-wide uppercase">{char.abilities[0].name}</p>
+                </div>
+                <p className="text-[11px] text-muted-foreground/80 line-clamp-2 pr-2">
+                  {char.abilities[0].description}
+                </p>
+              </div>
+
             </div>
-          </button>
+          </motion.div>
         ))}
       </div>
 
       {/* Start Button */}
-      <div className="flex justify-center">
-        <Button
-          size="lg"
-          disabled={!selectedCharacter || !playerName.trim()}
-          onClick={handleStart}
-          className="h-14 px-12 text-lg"
-        >
-          Begin Your Adventure
-        </Button>
-      </div>
-    </div>
+      <AnimatePresence>
+        {selectedCharacter && playerName.trim() && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="flex justify-center"
+          >
+            <div className="relative group cursor-pointer">
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary to-amber-600 rounded-xl blur opacity-40 group-hover:opacity-75 transition duration-500 animate-pulse"></div>
+              <Button
+                size="lg"
+                onClick={handleStart}
+                className="relative h-16 px-16 text-xl tracking-widest font-bold uppercase border-2 border-primary/50 bg-background/50 hover:bg-background/80 backdrop-blur-md overflow-hidden"
+                style={{ fontFamily: 'Cinzel, serif' }}
+              >
+                <span className="relative z-10 drop-shadow-md">Begin Journey</span>
+                <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-primary/10 to-transparent -translate-x-[100%] group-hover:animate-[shimmer_2s_infinite]"></div>
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
