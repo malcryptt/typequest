@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { CHARACTERS, CharacterData } from './characters';
 import { REGIONS } from './regions';
-import type { Level, Item, Quest, ActiveEffect } from './types';
+import type { Level, Item, Quest, ActiveEffect, CombatState, DamageNumber, BattleLogEntry } from './types';
 import { ITEMS } from './items';
 import { EnemyData, getRandomWord, ENEMIES } from './enemies';
 
@@ -35,46 +35,7 @@ export interface Player {
   quests: Record<string, Quest>;
 }
 
-export interface CombatState {
-  isActive: boolean;
-  currentEnemy: EnemyData | null;
-  currentWord: string;
-  typedChars: string;
-  wpm: number;
-  accuracy: number;
-  combo: number;
-  maxCombo: number;
-  totalCharsTyped: number;
-  correctChars: number;
-  startTime: number | null;
-  playerHealth: number;
-  playerMana: number;
-  enemyHealth: number;
-  abilityCooldowns: Record<string, number>;
-  activeEffects: ActiveEffect[];
-  isEnraged: boolean;
-  damageNumbers: DamageNumber[];
-  battleLog: BattleLogEntry[];
-  enemyIndex: number;
-  totalEnemies: number;
-}
 
-export interface DamageNumber {
-  id: string;
-  value: number;
-  x: number;
-  y: number;
-  isCrit: boolean;
-  isHeal: boolean;
-  isPlayerDamage: boolean;
-}
-
-export interface BattleLogEntry {
-  id: string;
-  text: string;
-  type: 'damage' | 'heal' | 'ability' | 'enemy' | 'system';
-  timestamp: number;
-}
 
 export interface Statistics {
   totalWordsTyped: number;
@@ -107,7 +68,11 @@ interface GameStore {
   equipment: {
     weapon: string | null;
     armor: string | null;
-    accessory: string | null;
+    helmet: string | null;
+    boots: string | null;
+    ring: string | null;
+    amulet: string | null;
+    offhand: string | null;
   };
   regionProgress: RegionProgress;
   currentLevel: Level | null;
@@ -133,7 +98,7 @@ interface GameStore {
   addItem: (itemId: string, quantity?: number) => void;
   removeItem: (itemId: string, quantity?: number) => void;
   equipItem: (itemId: string) => void;
-  unequipItem: (slot: 'weapon' | 'armor' | 'accessory') => void;
+  unequipItem: (slot: 'weapon' | 'armor' | 'helmet' | 'boots' | 'ring' | 'amulet' | 'offhand') => void;
   useItem: (itemId: string) => void;
 
   // Progress
@@ -179,6 +144,10 @@ const DEFAULT_COMBAT: CombatState = {
   abilityCooldowns: {},
   activeEffects: [],
   isEnraged: false,
+  isRaging: false,
+  shieldWord: null,
+  shieldTypedChars: '',
+  bossCorrectWords: 0,
   damageNumbers: [],
   battleLog: [],
   enemyIndex: 0,
@@ -241,7 +210,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   player: null,
   combat: DEFAULT_COMBAT,
   inventory: {},
-  equipment: { weapon: null, armor: null, accessory: null },
+  equipment: { weapon: null, armor: null, helmet: null, boots: null, ring: null, amulet: null, offhand: null },
   regionProgress: initializeRegionProgress(),
   currentLevel: null,
   currentRegion: 'verdant_vale',
@@ -281,7 +250,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     set({
       player,
       inventory: { health_potion: 3 },
-      equipment: { weapon: null, armor: null, accessory: null },
+      equipment: { weapon: null, armor: null, helmet: null, boots: null, ring: null, amulet: null, offhand: null },
       regionProgress: initializeRegionProgress(),
       statistics: DEFAULT_STATISTICS,
       progress: { currentCharacter: characterId, level: 1, currentLevel: null },
@@ -336,6 +305,38 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     const state = get();
     if (!state.combat.isActive || !state.combat.currentEnemy || !state.player) return;
 
+    // --- SHIELD INTERCEPT MECHANIC ---
+    if (state.combat.shieldWord) {
+      const expectedShieldChar = state.combat.shieldWord[state.combat.shieldTypedChars.length];
+      const isCorrectShield = char.toLowerCase() === expectedShieldChar?.toLowerCase();
+
+      if (isCorrectShield) {
+        const newShieldTyped = state.combat.shieldTypedChars + char;
+        if (newShieldTyped.length >= state.combat.shieldWord.length) {
+          // Shield blocked successfully!
+          set({
+            combat: {
+              ...state.combat,
+              shieldWord: null,
+              shieldTypedChars: '',
+              battleLog: [
+                ...state.combat.battleLog.slice(-8),
+                {
+                  id: Date.now().toString(),
+                  text: 'Attack Blocked!',
+                  type: 'system',
+                  timestamp: Date.now(),
+                },
+              ],
+            }
+          });
+        } else {
+          set({ combat: { ...state.combat, shieldTypedChars: newShieldTyped } });
+        }
+      }
+      return; // Do not process normal combat words when shield is active
+    }
+
     const expectedChar = state.combat.currentWord[state.combat.typedChars.length];
     const isCorrect = char.toLowerCase() === expectedChar?.toLowerCase();
 
@@ -368,7 +369,6 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       maxCombo: newMaxCombo,
     };
 
-    // Deal damage on word completion
     if (wordComplete && state.combat.currentEnemy) {
       const { damage, isCrit } = calculateDamage(
         state.player.attack,
@@ -378,17 +378,38 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         state.player.critChance
       );
 
-      const newEnemyHealth = Math.max(0, state.combat.enemyHealth - damage);
+      let finalDamage = damage;
+      let newBossCorrectWords = state.combat.bossCorrectWords;
+
+      // Boss Mechanics
+      if (state.combat.currentEnemy.isBoss) {
+        newBossCorrectWords++;
+        const wpmGate = 40;
+        if (newWpm >= wpmGate) {
+          finalDamage = Math.floor(finalDamage * (newWpm / wpmGate));
+        } else {
+          finalDamage = Math.floor(finalDamage * 0.3); // chip damage penalty
+        }
+      }
+
+      const newEnemyHealth = Math.max(0, state.combat.enemyHealth - finalDamage);
+
+      // Scramble words if Raging
+      let nextBaseWord = getRandomWord(state.combat.currentEnemy);
+      if (state.combat.isRaging) {
+        nextBaseWord = nextBaseWord.split('').sort(() => Math.random() - 0.5).join('');
+      }
 
       newCombat = {
         ...newCombat,
-        currentWord: getRandomWord(state.combat.currentEnemy),
+        currentWord: state.combat.isEnraged && !state.combat.isRaging ? `${nextBaseWord} ${getRandomWord(state.combat.currentEnemy)}` : nextBaseWord,
         enemyHealth: newEnemyHealth,
+        bossCorrectWords: newBossCorrectWords,
         damageNumbers: [
           ...state.combat.damageNumbers.slice(-5),
           {
             id: Date.now().toString(),
-            value: damage,
+            value: finalDamage,
             x: 60 + Math.random() * 20 - 10,
             y: 30 + Math.random() * 10,
             isCrit,
@@ -400,7 +421,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
           ...state.combat.battleLog.slice(-9),
           {
             id: Date.now().toString(),
-            text: isCrit ? `CRITICAL! ${damage} damage!` : `${damage} damage!`,
+            text: isCrit ? `CRITICAL! ${finalDamage} damage!` : `${finalDamage} damage!`,
             type: 'damage',
             timestamp: Date.now(),
           },
@@ -413,7 +434,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
           ...s.statistics,
           totalWordsTyped: s.statistics.totalWordsTyped + 1,
           totalCharactersTyped: s.statistics.totalCharactersTyped + state.combat.currentWord.length,
-          totalDamageDealt: s.statistics.totalDamageDealt + damage,
+          totalDamageDealt: s.statistics.totalDamageDealt + finalDamage,
           bestWpm: Math.max(s.statistics.bestWpm, newWpm),
           highestCombo: Math.max(s.statistics.highestCombo, newMaxCombo),
         },
@@ -512,16 +533,28 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       .filter(e => e.duration > 0);
 
     let isEnraged = state.combat.isEnraged;
+    let isRaging = state.combat.isRaging;
     let logEntries = state.combat.battleLog.slice(-9);
 
-    if (state.combat.currentEnemy.isBoss && !isEnraged && state.combat.enemyHealth <= state.combat.currentEnemy.maxHealth / 2) {
-      isEnraged = true;
-      logEntries.push({
-        id: Date.now().toString() + 'enrage',
-        text: `${state.combat.currentEnemy.name} becomes ENRAGED!`,
-        type: 'system',
-        timestamp: Date.now(),
-      });
+    if (state.combat.currentEnemy.isBoss) {
+      if (!isEnraged && state.combat.enemyHealth <= state.combat.currentEnemy.maxHealth * 0.6) {
+        isEnraged = true;
+        logEntries.push({
+          id: Date.now().toString() + 'enrage',
+          text: `${state.combat.currentEnemy.name} becomes ENRAGED! (Double Words)`,
+          type: 'system',
+          timestamp: Date.now(),
+        });
+      }
+      if (!isRaging && state.combat.enemyHealth <= state.combat.currentEnemy.maxHealth * 0.3) {
+        isRaging = true;
+        logEntries.push({
+          id: Date.now().toString() + 'rage',
+          text: `${state.combat.currentEnemy.name} shifts into RAGE MODE! (Scrambled Words)`,
+          type: 'system',
+          timestamp: Date.now(),
+        });
+      }
     }
 
     if (stunned) {
@@ -541,6 +574,50 @@ export const useGameStore = create<GameStore>()((set, get) => ({
           ],
         },
       });
+      return;
+    }
+
+    // Shield Attack Random Event (25% chance during Boss Phase > 1)
+    if (state.combat.currentEnemy.isBoss && Math.random() < 0.25) {
+      const sWord = getRandomWord(state.combat.currentEnemy).toUpperCase();
+      set({
+        combat: {
+          ...state.combat,
+          shieldWord: sWord,
+          shieldTypedChars: '',
+          battleLog: [
+            ...logEntries.slice(-8),
+            {
+              id: Date.now().toString() + 'shield',
+              text: 'INCOMING SPECIAL ATTACK! TYPE TO BLOCK!',
+              type: 'enemy',
+              timestamp: Date.now(),
+            },
+          ]
+        }
+      });
+
+      // Auto damage penalty if they don't solve it in 2 seconds
+      setTimeout(() => {
+        const freshState = get();
+        if (freshState.combat.shieldWord === sWord) {
+          const missDamage = state.combat.currentEnemy!.attack * 3;
+          const updatedHealth = Math.max(0, freshState.combat.playerHealth - missDamage);
+          set({
+            combat: {
+              ...freshState.combat,
+              shieldWord: null,
+              shieldTypedChars: '',
+              playerHealth: updatedHealth,
+              battleLog: [
+                ...freshState.combat.battleLog.slice(-8),
+                { id: Date.now().toString() + 'fail', text: `BLOCK FAILED! Took ${missDamage} damage!`, type: 'enemy', timestamp: Date.now() }
+              ]
+            }
+          });
+          if (updatedHealth <= 0) get().endCombat(false);
+        }
+      }, 2000);
       return;
     }
 

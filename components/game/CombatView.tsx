@@ -232,12 +232,25 @@ function TypingDisplay() {
 
   return (
     <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col items-center gap-6 z-20 w-full pointer-events-none">
-      <WordDisplay word={combat.currentWord} typedChars={combat.typedChars} />
-      <div className="bg-background/40 backdrop-blur-md px-6 py-2 rounded-full border border-border/50">
-        <p className="text-sm text-foreground/80 tracking-wider">
-          Type the word to attack! Speed and accuracy increase damage.
-        </p>
-      </div>
+      {combat.shieldWord ? (
+        <div className="flex flex-col items-center gap-2 animate-in fade-in zoom-in duration-300">
+          <div className="bg-destructive/80 text-destructive-foreground px-6 py-2 rounded-full font-bold text-lg animate-pulse shadow-[0_0_30px_rgba(255,0,0,0.6)]">
+            🛡️ INCOMING SPECIAL ATTACK! TYPE TO BLOCK!
+          </div>
+          <WordDisplay word={combat.shieldWord} typedChars={combat.shieldTypedChars} />
+        </div>
+      ) : (
+        <>
+          <WordDisplay word={combat.currentWord} typedChars={combat.typedChars} />
+          <div className="bg-background/40 backdrop-blur-md px-6 py-2 rounded-full border border-border/50">
+            <p className="text-sm text-foreground/80 tracking-wider">
+              {combat.isEnraged && !combat.isRaging && <span className="text-destructive font-bold mr-2">ENRAGED: Double Words!</span>}
+              {combat.isRaging && <span className="text-destructive font-bold mr-2">RAGE MODE: Scrambled Words!</span>}
+              {!combat.isEnraged && !combat.isRaging && "Type the word to attack! Speed and accuracy increase damage."}
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }

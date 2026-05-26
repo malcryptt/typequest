@@ -13,9 +13,12 @@ const rarityLabel: Record<string, string> = {
 };
 
 const SLOT_CONFIG = [
-  { slot: "weapon" as const, label: "Weapon", icon: <Sword size={22} /> },
+  { slot: "helmet" as const, label: "Helmet", icon: <Crown size={22} /> },
+  { slot: "amulet" as const, label: "Amulet", icon: <Gem size={22} /> },
   { slot: "armor" as const, label: "Armor", icon: <Shield size={22} /> },
-  { slot: "accessory" as const, label: "Accessory", icon: <Gem size={22} /> },
+  { slot: "offhand" as const, label: "Offhand", icon: <Shield size={22} /> },
+  { slot: "boots" as const, label: "Boots", icon: <Shield size={22} /> },
+  { slot: "ring" as const, label: "Ring", icon: <Gem size={22} /> },
 ];
 
 function getItemIcon(item: Item) {
@@ -62,7 +65,7 @@ function ItemCard({ item, qty, onClick, isEquipped }: { item: Item; qty: number;
 }
 
 function EquipSlot({ slotKey, label, icon, equippedId, onClick }: {
-  slotKey: "weapon" | "armor" | "accessory"; label: string; icon: React.ReactNode;
+  slotKey: "weapon" | "armor" | "helmet" | "boots" | "ring" | "amulet" | "offhand"; label: string; icon: React.ReactNode;
   equippedId: string | null; onClick: () => void;
 }) {
   const item = equippedId ? ITEMS[equippedId] : null;
@@ -133,7 +136,7 @@ function ItemDetailSheet({ item, qty, onClose }: { item: Item; qty: number; onCl
         <div className="flex gap-3 mt-5">
           {item.type !== "consumable" && (
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-              onClick={() => { isEquipped ? unequipItem(item.type as "weapon" | "armor" | "accessory") : equipItem(item.id); onClose(); }}
+              onClick={() => { isEquipped ? unequipItem(item.type as "weapon" | "armor" | "helmet" | "boots" | "ring" | "amulet" | "offhand") : equipItem(item.id); onClose(); }}
               className="flex-1 h-12 rounded-xl font-bold text-white transition-all"
               style={{ background: isEquipped ? "oklch(0.4 0.1 280)" : `linear-gradient(135deg, ${rarityColor}, oklch(0.4 0.12 280))`, boxShadow: `0 4px 20px ${rarityColor}55` }}>
               {isEquipped ? "Unequip" : "Equip"}
@@ -230,7 +233,7 @@ export function InventoryView() {
           </div>
 
           {/* Equipment slots */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {SLOT_CONFIG.map(({ slot, label, icon }) => (
               <EquipSlot key={slot} slotKey={slot} label={label} icon={icon}
                 equippedId={equipment[slot]}

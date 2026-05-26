@@ -74,7 +74,7 @@ export interface Item {
   id: string;
   name: string;
   description: string;
-  type: 'weapon' | 'armor' | 'accessory' | 'consumable' | 'key';
+  type: 'weapon' | 'armor' | 'helmet' | 'boots' | 'ring' | 'amulet' | 'offhand' | 'consumable' | 'key' | 'accessory';
   rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   stats?: Partial<CharacterStats>;
   effect?: string;
@@ -151,8 +151,14 @@ export interface CombatState {
   abilityCooldowns: Record<string, number>;
   activeEffects: ActiveEffect[];
   isEnraged: boolean;
+  isRaging: boolean;
+  shieldWord: string | null;
+  shieldTypedChars: string;
+  bossCorrectWords: number;
   damageNumbers: DamageNumber[];
   battleLog: BattleLogEntry[];
+  enemyIndex: number;
+  totalEnemies: number;
 }
 
 export interface DamageNumber {
@@ -183,7 +189,11 @@ export interface PlayerProgress {
   equipment: {
     weapon?: string;
     armor?: string;
-    accessory?: string;
+    helmet?: string;
+    boots?: string;
+    ring?: string;
+    amulet?: string;
+    offhand?: string;
   };
   completedLevels: string[];
   achievements: string[];
