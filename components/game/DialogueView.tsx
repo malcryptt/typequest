@@ -13,7 +13,7 @@ interface DialogueViewProps {
 }
 
 export function DialogueView({ npcId, onClose }: DialogueViewProps) {
-  const { npcInteractions, recordNpcInteraction, addItem, setGameState } = useGameStore();
+  const { npcInteractions, recordNpcInteraction, addItem, setGameState, startQuest, completeQuest } = useGameStore();
   const [currentDialogueId, setCurrentDialogueId] = useState<string>("intro");
   const [displayedText, setDisplayedText] = useState("");
   const [isTyping, setIsTyping] = useState(true);
@@ -80,6 +80,16 @@ export function DialogueView({ npcId, onClose }: DialogueViewProps) {
           recordNpcInteraction(npcId);
           setGameState("worldMap");
           return;
+        case "startQuest":
+          if (response.action.questId) {
+            startQuest(response.action.questId, "Shadows of Dragon's Peak", "Banish the darkness spreading from the mountains by progressing through each region.");
+          }
+          break;
+        case "completeQuest":
+          if (response.action.questId) {
+            completeQuest(response.action.questId);
+          }
+          break;
       }
     }
 
@@ -157,6 +167,8 @@ export function DialogueView({ npcId, onClose }: DialogueViewProps) {
                   <span className="flex-1 text-foreground font-medium">{response.text}</span>
                   {response.action?.type === "giveItem" && <span className="text-xs bg-amber-500/20 text-amber-300 font-bold px-2 py-1 rounded">Gain Item</span>}
                   {response.action?.type === "openShop" && <span className="text-xs bg-emerald-500/20 text-emerald-300 font-bold px-2 py-1 rounded">Open Shop</span>}
+                  {response.action?.type === "startQuest" && <span className="text-xs bg-indigo-500/20 text-indigo-300 font-bold px-2 py-1 rounded">New Quest</span>}
+                  {response.action?.type === "completeQuest" && <span className="text-xs bg-blue-500/20 text-blue-300 font-bold px-2 py-1 rounded">Quest Complete</span>}
                 </motion.button>
               ))
             ) : (

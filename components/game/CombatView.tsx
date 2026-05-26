@@ -337,7 +337,7 @@ function CombatMenu() {
       <button
         onClick={() => {
           if (confirm('Are you sure you want to flee? You will lose this battle.')) {
-            setScreen('world-map');
+            setScreen('worldMap');
           }
         }}
         className="px-3 py-1 bg-destructive/80 backdrop-blur border border-destructive rounded-lg text-sm hover:bg-destructive transition-colors text-destructive-foreground"

@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { CHARACTERS, CharacterData } from './characters';
 import { REGIONS } from './regions';
-import type { Level, Item } from './types';
+import type { Level, Item, Quest, ActiveEffect } from './types';
 import { ITEMS } from './items';
 import { EnemyData, getRandomWord, ENEMIES } from './enemies';
 
@@ -32,6 +32,7 @@ export interface Player {
   speed: number;
   critChance: number;
   gold: number;
+  quests: Record<string, Quest>;
 }
 
 export interface CombatState {
@@ -50,6 +51,8 @@ export interface CombatState {
   playerMana: number;
   enemyHealth: number;
   abilityCooldowns: Record<string, number>;
+  activeEffects: ActiveEffect[];
+  isEnraged: boolean;
   damageNumbers: DamageNumber[];
   battleLog: BattleLogEntry[];
   enemyIndex: number;
@@ -135,9 +138,15 @@ interface GameStore {
 
   // Progress
   addExperience: (amount: number) => void;
+  levelUp: () => void;
   addGold: (amount: number) => void;
   completeLevel: (levelId: string, stars: number) => void;
   unlockRegion: (regionId: string) => void;
+
+  // Quests
+  startQuest: (questId: string, title: string, description: string, target?: number) => void;
+  updateQuest: (questId: string, amount?: number) => void;
+  completeQuest: (questId: string) => void;
 
   // NPCs
   recordNpcInteraction: (npcId: string) => void;
@@ -168,6 +177,8 @@ const DEFAULT_COMBAT: CombatState = {
   playerMana: 80,
   enemyHealth: 0,
   abilityCooldowns: {},
+  activeEffects: [],
+  isEnraged: false,
   damageNumbers: [],
   battleLog: [],
   enemyIndex: 0,
@@ -264,6 +275,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       speed: character.baseStats.speed,
       critChance: character.baseStats.critChance,
       gold: 100,
+      quests: {},
     };
 
     set({
@@ -436,13 +448,28 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     let newPlayerHealth = state.combat.playerHealth;
     let newEnemyHealth = state.combat.enemyHealth;
     const newMana = state.combat.playerMana - ability.manaCost;
+    let newActiveEffects = [...state.combat.activeEffects];
 
     if (ability.effect === 'heal' && ability.effectValue) {
       newPlayerHealth = Math.min(state.player.maxHp, newPlayerHealth + ability.effectValue);
     } else {
       // Deal damage
-      const damage = ability.damage * (1 + state.player.level * 0.1);
+      let damage = ability.damage * (1 + state.player.level * 0.1);
+
+      // Check if player has an attack buff
+      const attackBuff = newActiveEffects.find(e => e.type === 'buff');
+      if (attackBuff) damage *= (1 + attackBuff.value / 100);
+
       newEnemyHealth = Math.max(0, newEnemyHealth - damage);
+
+      // Add combat effect (stun, dot, buff)
+      if (ability.effect && ability.effect !== 'heal') {
+        newActiveEffects.push({
+          type: ability.effect,
+          value: ability.effectValue || 0,
+          duration: 3, // default 3 turns
+        });
+      }
     }
 
     set({
@@ -451,6 +478,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         playerMana: newMana,
         playerHealth: newPlayerHealth,
         enemyHealth: newEnemyHealth,
+        activeEffects: newActiveEffects,
         abilityCooldowns: {
           ...state.combat.abilityCooldowns,
           [abilityId]: Date.now() + ability.cooldown * 1000,
@@ -477,13 +505,68 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     const state = get();
     if (!state.combat.isActive || !state.combat.currentEnemy || !state.player) return;
 
-    const damage = Math.max(1, state.combat.currentEnemy.attack - state.player.defense / 2);
+    // Tick active effects
+    const stunned = state.combat.activeEffects.some(e => e.type === 'stun');
+    const newActiveEffects = state.combat.activeEffects
+      .map(e => ({ ...e, duration: e.duration - 1 }))
+      .filter(e => e.duration > 0);
+
+    let isEnraged = state.combat.isEnraged;
+    let logEntries = state.combat.battleLog.slice(-9);
+
+    if (state.combat.currentEnemy.isBoss && !isEnraged && state.combat.enemyHealth <= state.combat.currentEnemy.maxHealth / 2) {
+      isEnraged = true;
+      logEntries.push({
+        id: Date.now().toString() + 'enrage',
+        text: `${state.combat.currentEnemy.name} becomes ENRAGED!`,
+        type: 'system',
+        timestamp: Date.now(),
+      });
+    }
+
+    if (stunned) {
+      set({
+        combat: {
+          ...state.combat,
+          activeEffects: newActiveEffects,
+          isEnraged,
+          battleLog: [
+            ...logEntries.slice(-8),
+            {
+              id: Date.now().toString(),
+              text: `${state.combat.currentEnemy.name} is stunned and couldn't attack!`,
+              type: 'system',
+              timestamp: Date.now(),
+            },
+          ],
+        },
+      });
+      return;
+    }
+
+    const enrageMultiplier = isEnraged ? 1.5 : 1;
+    let rawAttack = state.combat.currentEnemy.attack * enrageMultiplier;
+
+    // Check debuffs on enemy
+    const debuff = newActiveEffects.find(e => e.type === 'debuff');
+    if (debuff) rawAttack *= (1 - debuff.value / 100);
+
+    const damage = Math.floor(Math.max(1, rawAttack - state.player.defense / 2));
     const newPlayerHealth = Math.max(0, state.combat.playerHealth - damage);
+
+    logEntries.push({
+      id: Date.now().toString(),
+      text: `${state.combat.currentEnemy.name} attacks for ${damage}!`,
+      type: 'enemy',
+      timestamp: Date.now(),
+    });
 
     set({
       combat: {
         ...state.combat,
         playerHealth: newPlayerHealth,
+        activeEffects: newActiveEffects,
+        isEnraged,
         damageNumbers: [
           ...state.combat.damageNumbers.slice(-5),
           {
@@ -496,15 +579,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
             isPlayerDamage: true,
           },
         ],
-        battleLog: [
-          ...state.combat.battleLog.slice(-9),
-          {
-            id: Date.now().toString(),
-            text: `${state.combat.currentEnemy.name} attacks for ${damage}!`,
-            type: 'enemy',
-            timestamp: Date.now(),
-          },
-        ],
+        battleLog: logEntries.slice(-9),
       },
     });
 
@@ -537,6 +612,8 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         enemyHealth: nextEnemy.maxHealth,
         enemyIndex: nextIndex,
         typedChars: '',
+        activeEffects: [],
+        isEnraged: false,
         battleLog: [
           ...state.combat.battleLog.slice(-9),
           {
@@ -659,31 +736,59 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
       let newExp = state.player.experience + amount;
       let newLevel = state.player.level;
-      let expToNext = state.player.experienceToNext;
+      let newExpToNext = state.player.experienceToNext;
+      let player = { ...state.player };
 
-      while (newExp >= expToNext) {
-        newExp -= expToNext;
-        newLevel++;
-        expToNext = getExpForLevel(newLevel);
+      const logEntries: BattleLogEntry[] = [];
+
+      while (newExp >= newExpToNext) {
+        newExp -= newExpToNext;
+        newLevel += 1;
+        newExpToNext = Math.floor(newExpToNext * 1.5); // Exponential scaling
+
+        // Boost stats dynamically
+        player.maxHp += 20;
+        player.maxMp += 10;
+        player.attack += 5;
+        player.defense += 5;
+        player.hp = player.maxHp;      // Heal on level up
+        player.mp = player.maxMp;
+
+        logEntries.push({
+          id: Date.now().toString() + String(newLevel),
+          text: `Level Up! Reached level ${newLevel}! Stats increased.`,
+          type: 'system',
+          timestamp: Date.now(),
+        });
       }
 
-      // Level up stat bonuses
-      const character = CHARACTERS[state.player.characterId];
-      const statBonus = newLevel - state.player.level;
+      player.level = newLevel;
+      player.experience = newExp;
+      player.experienceToNext = newExpToNext;
 
-      return {
-        player: {
-          ...state.player,
-          experience: newExp,
-          level: newLevel,
-          experienceToNext: expToNext,
-          maxHp: state.player.maxHp + statBonus * 10,
-          hp: state.player.hp + statBonus * 10,
-          attack: state.player.attack + statBonus * 2,
-          defense: state.player.defense + statBonus * 1,
-        },
-        progress: { ...state.progress, level: newLevel },
-      };
+      // Update battle log if leveling happened mid-combat
+      const newCombat = logEntries.length > 0 && state.combat.isActive
+        ? { ...state.combat, battleLog: [...state.combat.battleLog.slice(0, 10 - logEntries.length), ...logEntries] }
+        : state.combat;
+
+      return { player, combat: newCombat };
+    });
+  },
+
+  levelUp: () => {
+    // Explicit trigger if needed
+    set((state) => {
+      if (!state.player) return state;
+      let player = { ...state.player };
+      player.level += 1;
+      player.maxHp += 20;
+      player.maxMp += 10;
+      player.attack += 5;
+      player.defense += 5;
+      player.hp = player.maxHp;
+      player.mp = player.maxMp;
+      player.experienceToNext = Math.floor(player.experienceToNext * 1.5);
+      return { player };
     });
   },
 
@@ -691,6 +796,45 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     set((state) => ({
       player: state.player ? { ...state.player, gold: state.player.gold + amount } : null,
     }));
+  },
+
+  startQuest: (questId, title, description, target) => {
+    set((state) => {
+      if (!state.player) return state;
+      return {
+        player: {
+          ...state.player,
+          quests: {
+            ...(state.player.quests || {}),
+            [questId]: { id: questId, title, description, status: 'active', progress: 0, target }
+          }
+        }
+      };
+    });
+  },
+
+  updateQuest: (questId, amount = 1) => {
+    set((state) => {
+      if (!state.player || !state.player.quests || !state.player.quests[questId]) return state;
+      const quest = state.player.quests[questId];
+      if (quest.status === 'completed') return state;
+
+      const newProgress = quest.progress + amount;
+      const isComplete = quest.target ? newProgress >= quest.target : false;
+
+      return {
+        player: { ...state.player, quests: { ...state.player.quests, [questId]: { ...quest, progress: newProgress, status: isComplete ? 'completed' : 'active' } } }
+      };
+    });
+  },
+
+  completeQuest: (questId) => {
+    set((state) => {
+      if (!state.player || !state.player.quests || !state.player.quests[questId]) return state;
+      return {
+        player: { ...state.player, quests: { ...state.player.quests, [questId]: { ...state.player.quests[questId], status: 'completed', progress: state.player.quests[questId].target || 1 } } }
+      };
+    });
   },
 
   completeLevel: (levelId, stars) => {

@@ -12,6 +12,21 @@ export interface CharacterStats {
   critDamage: number;
 }
 
+export interface ActiveEffect {
+  type: 'stun' | 'buff' | 'debuff' | 'dot' | 'heal';
+  value: number;
+  duration: number; // Duration in turns relative to attack cycles
+}
+
+export interface Quest {
+  id: string;
+  title: string;
+  description: string;
+  status: 'active' | 'completed';
+  progress: number;
+  target?: number;
+}
+
 export interface Character {
   id: CharacterClass;
   name: string;
@@ -134,6 +149,8 @@ export interface CombatState {
   playerMana: number;
   enemyHealth: number;
   abilityCooldowns: Record<string, number>;
+  activeEffects: ActiveEffect[];
+  isEnraged: boolean;
   damageNumbers: DamageNumber[];
   battleLog: BattleLogEntry[];
 }
@@ -205,7 +222,7 @@ export interface Achievement {
   unlocked: boolean;
 }
 
-export type GameScreen = 
+export type GameScreen =
   | 'main-menu'
   | 'character-select'
   | 'world-map'
